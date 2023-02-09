@@ -298,7 +298,7 @@ void set_device(int64_t device_id);
 double get_time_us_sync_device();
 
 /*! \brief  CPU Timer(in microsecond): synchronize with given queue/stream and return wall time */
-double get_time_us_sync(hipStream_t stream);
+double get_time_us_sync();
 
 /*! \brief  CPU Timer(in microsecond): no GPU synchronization and return wall time */
 double get_time_us_no_sync();

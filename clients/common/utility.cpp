@@ -115,12 +115,13 @@ double get_time_us_sync_device(void)
 };
 
 /*! \brief  CPU Timer(in microsecond): synchronize with given queue/stream and return wall time */
-double get_time_us_sync(hipStream_t stream)
+double get_time_us_sync()
 {
-    if(hipDeviceSynchronize() != hipSuccess)
-    {
-        hipblaslt_cerr << "Synchronizing device failed" << std::endl;
-    }
+    // hipblaslt_cerr << "Synchronizing device failed" << std::endl;
+    // if(hipDeviceSynchronize() != hipSuccess)
+    // {
+    //     hipblaslt_cerr << "Synchronizing device failed" << std::endl;
+    // }
 
     auto now = std::chrono::steady_clock::now();
     // now.time_since_epoch() is the duration since epoch
@@ -133,6 +134,10 @@ double get_time_us_sync(hipStream_t stream)
 /*! \brief  CPU Timer(in microsecond): no GPU synchronization */
 double get_time_us_no_sync(void)
 {
+    // if(hipDeviceSynchronize() != hipSuccess)
+    // {
+    //     hipblaslt_cerr << "Synchronizing device failed" << std::endl;
+    // }
     auto now = std::chrono::steady_clock::now();
     // now.time_since_epoch() is the duration since epoch
     // which is converted to microseconds

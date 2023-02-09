@@ -65,10 +65,42 @@
 
 #define HIPBLASLT_LIB_PATH "/opt/rocm/hipblaslt/lib"
 
+double get_time_us_no_sync(void)
+{
+    // if(hipDeviceSynchronize() != hipSuccess)
+    // {
+    //     std::cout << "Synchronizing device failed" << std::endl;
+    // }
+    auto now = std::chrono::steady_clock::now();
+    // now.time_since_epoch() is the duration since epoch
+    // which is converted to microseconds
+    auto duration
+        = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+    return (static_cast<double>(duration));
+};
+/*! \brief  CPU Timer(in microsecond): synchronize with given queue/stream and return wall time */
+double get_time_us_sync()
+{
+    // hipblaslt_cerr << "Synchronizing device failed" << std::endl;
+    if(hipDeviceSynchronize() != hipSuccess)
+    {
+        std::cout << "Synchronizing device failed" << std::endl;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    // now.time_since_epoch() is the duration since epoch
+    // which is converted to microseconds
+    auto duration
+        = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+    return (static_cast<double>(duration));
+};
+
 namespace
 {
 #ifndef WIN32
     std::string hipblaslt_so_path;
+
+
 
     int hipblaslt_dl_iterate_phdr_callback(struct dl_phdr_info* hdr_info, size_t size, void* data)
     {
@@ -334,6 +366,10 @@ namespace
     template <typename Ti, typename To, typename Tc>
     auto GetTensileInputs(const RocblasltContractionProblem<Ti, To, Tc>& prob)
     {
+        // double gpu_time_used;
+        // gpu_time_used = 0.0;
+        // gpu_time_used = get_time_us_no_sync(); // in microseconds
+
         // Tensile types corresponding to Ti, To, Tc
         using Tensile_Ti          = typename rocblaslt_to_tensile_type<Ti>::tensile_type;
         using Tensile_To          = typename rocblaslt_to_tensile_type<To>::tensile_type;
@@ -346,8 +382,8 @@ namespace
 
         static_assert(std::is_standard_layout<Ti>{} && std::is_standard_layout<Tensile_Ti>{}
                           && std::is_standard_layout<To>{} && std::is_standard_layout<Tensile_To>{},
-                      "Tensile or rocblaslt types are not standard layout types");
-
+                      "Tensile or rocblaslt types are not standard layout types"); 
+        
         // Structure describing the inputs (A, B, C, D, alpha, beta)
         Tensile::TypedContractionInputs<Tensile_Ti,
                                         Tensile_Ti,
@@ -356,7 +392,7 @@ namespace
                                         Tensile_Talpha_beta,
                                         Tensile_Talpha_beta>
             inputs;
-
+        
         // Set the A, B, C, D matrices pointers in Tensile
         inputs.a = reinterpret_cast<const Tensile_Ti*>(prob.A);
         inputs.b = reinterpret_cast<const Tensile_Ti*>(prob.B);
@@ -389,6 +425,8 @@ namespace
             memset(&inputs.alpha, 0, sizeof(inputs.alpha));
         AlphaBeta<Ti, To, Tc>::copy(&inputs.beta, prob.beta);
 
+        // gpu_time_used = get_time_us_no_sync() - gpu_time_used;
+        // std::cout << "GetTensileInputs:" << gpu_time_used << std::endl;
         return inputs;
     }
 
@@ -707,9 +745,16 @@ template <typename Ti, typename To, typename Tc>
 rocblaslt_status runContractionProblem(const rocblaslt_matmul_algo*                   algo,
                                        const RocblasltContractionProblem<Ti, To, Tc>& prob)
 {
+    // double gpu_time_used;
+    // gpu_time_used = 0.0;
+    // gpu_time_used = get_time_us_no_sync(); // in microseconds
     rocblaslt_status status = rocblaslt_status_internal_error;
     try
     {
+        // double gpu_time_used;
+        // gpu_time_used = 0.0;
+        // gpu_time_used = get_time_us_no_sync(); // in microseconds
+
         std::shared_ptr<Tensile::MasterSolutionLibrary<Tensile::ContractionProblem>> library;
         std::shared_ptr<hipDeviceProp_t>                                             deviceProp;
         std::shared_ptr<Tensile::Hardware>                                           hardware;
@@ -717,7 +762,9 @@ rocblaslt_status runContractionProblem(const rocblaslt_matmul_algo*             
         auto& adapter = get_library_and_adapter(&library, &deviceProp, prob.handle->device);
 
         hardware          = Tensile::hip::GetDevice(*deviceProp);
+        // gpu_time_used = get_time_us_no_sync(); // in microseconds
         auto tensile_prob = ConstructTensileProblem(prob);
+        // gpu_time_used = get_time_us_no_sync() - gpu_time_used;
         if(algo->fallback && prob.bias == nullptr && prob.scaleD == nullptr
            && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
         {
@@ -729,6 +776,8 @@ rocblaslt_status runContractionProblem(const rocblaslt_matmul_algo*             
         std::shared_ptr<Tensile::ContractionSolution> solution
             = std::static_pointer_cast<Tensile::ContractionSolution>(algo->data.ptr);
 
+        // gpu_time_used = get_time_us_no_sync() - gpu_time_used;
+        // std::cout << "runContractionProblem:" << gpu_time_used << std::endl;
         if(!solution)
         {
 #if 0
@@ -739,10 +788,20 @@ rocblaslt_status runContractionProblem(const rocblaslt_matmul_algo*             
         }
         else
         {
-            adapter.launchKernels(solution->solve(tensile_prob, GetTensileInputs(prob), *hardware),
+            // double gpu_time_used2;
+            // gpu_time_used2 = 0.0;
+            // gpu_time_used2 = get_time_us_no_sync(); // in microseconds
+
+            std::vector<Tensile::KernelInvocation> kernels = solution->solve(tensile_prob, GetTensileInputs(prob), *hardware);
+
+            // gpu_time_used2 = get_time_us_no_sync() - gpu_time_used2;
+            // std::cout << "launchKernels:" << gpu_time_used2 << std::endl;
+            // adapter.launchKernels(solution->solve(tensile_prob, GetTensileInputs(prob), *hardware),
+            adapter.launchKernels(kernels,
                                   prob.stream,
                                   nullptr,
                                   nullptr);
+            
             status = rocblaslt_status_success;
         }
     }
@@ -762,6 +821,8 @@ rocblaslt_status runContractionProblem(const rocblaslt_matmul_algo*             
                        << "Tensile solution found, but unknown exception thrown for " << prob);
 #endif
     }
+    // gpu_time_used = get_time_us_no_sync() - gpu_time_used;
+    // std::cout << "runContractionProblem:" << gpu_time_used << std::endl;
 
     return status;
 }

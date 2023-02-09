@@ -1083,11 +1083,28 @@ namespace Tensile
         return name;
     }
 
+double get_time_us_no_sync(void)
+{
+    // if(hipDeviceSynchronize() != hipSuccess)
+    // {
+    //     std::cout << "Synchronizing device failed" << std::endl;
+    // }
+    auto now = std::chrono::steady_clock::now();
+    // now.time_since_epoch() is the duration since epoch
+    // which is converted to microseconds
+    auto duration
+        = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+    return (static_cast<double>(duration));
+};
+
     template <typename TypedInputs>
     std::vector<KernelInvocation> ContractionSolution::solveTyped(Problem const&     problem,
                                                                   TypedInputs const& inputs,
                                                                   Hardware const&    hardware) const
     {
+        // double gpu_time_used2;
+        // gpu_time_used2 = 0.0;
+        // gpu_time_used2 = get_time_us_no_sync(); // in microseconds
         bool debug = Debug::Instance().printKernelArguments() || this->kernelArgsLog;
 
         int boundSize = 1;
@@ -1171,6 +1188,8 @@ namespace Tensile
                     generateActivationOnlyCall<TypedInputs, false>(problem, inputs, hardware));
         }
 
+        // gpu_time_used2 = get_time_us_no_sync() - gpu_time_used2;
+        // std::cout << "solveTyped:" << gpu_time_used2 << std::endl;
         return rv;
     }
 
@@ -1179,6 +1198,10 @@ namespace Tensile
                                    ContractionSolution::Inputs const&  inputs,
                                    Hardware const&                     hardware) const
     {
+        // double gpu_time_used2;
+        // gpu_time_used2 = 0.0;
+        // gpu_time_used2 = get_time_us_no_sync(); // in microseconds
+
         if(Debug::Instance().printWinningKernelName())
             std::cout << "Running kernel: " << this->KernelName() << std::endl;
 
@@ -1211,6 +1234,8 @@ namespace Tensile
                                                                  problemType.dType,
                                                                  alphaType,
                                                                  betaType);
+        // gpu_time_used2 = get_time_us_no_sync() - gpu_time_used2;
+        // std::cout << "solve:" << gpu_time_used2 << std::endl;
 
         switch(contractionInputsTypeId)
         {

@@ -546,7 +546,7 @@ class GlobalWriteBatchWriter:
           waitLoadCnt = 0
           waitLocalLoadCnt = -1
 
-          if self.beta: waitLoadCnt = elementIdx + 1
+          if self.beta: waitLoadCnt = elementIdx
           if self.kernel["ProblemType"]["UseBias"] and (dataBias not in biasWaitDict):
             waitLocalLoadCnt = self.localLoadIssued - self.biasLoadIssued[elementIdx]
 

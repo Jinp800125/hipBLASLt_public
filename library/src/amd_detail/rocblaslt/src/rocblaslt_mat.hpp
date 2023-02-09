@@ -33,6 +33,20 @@
 
 #include "tensile_host.hpp"
 
+double get_time_us_no_sync2(void)
+{
+    // if(hipDeviceSynchronize() != hipSuccess)
+    // {
+    //     std::cout << "Synchronizing device failed" << std::endl;
+    // }
+    auto now = std::chrono::steady_clock::now();
+    // now.time_since_epoch() is the duration since epoch
+    // which is converted to microseconds
+    auto duration
+        = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+    return (static_cast<double>(duration));
+};
+
 template <typename Ti, typename To, typename Tc>
 rocblaslt_status rocblaslt_batched_template(rocblaslt_handle             handle,
                                             hipblasOperation_t           trans_a,
@@ -69,7 +83,12 @@ rocblaslt_status rocblaslt_batched_template(rocblaslt_handle             handle,
                                             rocblaslt_epilogue           epilogue,
                                             hipStream_t                  stream)
 {
+    // double gpu_time_used;
+    // gpu_time_used = 0.0;
+    // gpu_time_used = get_time_us_no_sync2(); // in microseconds
     workspaceSizeInBytes = min(workspaceSizeInBytes, algo->max_workspace_bytes);
+    // gpu_time_used = get_time_us_no_sync2() - gpu_time_used;
+    // std::cout << "gpu_time_used:" << gpu_time_used << std::endl;
     RocblasltContractionProblem<Ti, To, Tc> problem{handle,
                                                     trans_a,
                                                     trans_b,
@@ -107,6 +126,8 @@ rocblaslt_status rocblaslt_batched_template(rocblaslt_handle             handle,
                                                     workspace,
                                                     workspaceSizeInBytes,
                                                     stream};
+    // gpu_time_used = get_time_us_no_sync2() - gpu_time_used;
+    // std::cout << "rocblaslt_batched_template:" << gpu_time_used << std::endl;
     return runContractionProblem(algo, problem);
 }
 
@@ -146,6 +167,9 @@ rocblaslt_status rocblaslt_matmul_typecasting(rocblaslt_handle             handl
                                               rocblaslt_epilogue           epilogue,
                                               hipStream_t                  stream)
 {
+    // double gpu_time_used;
+    // gpu_time_used = 0.0;
+    // gpu_time_used = get_time_us_no_sync2(); // in microseconds
     // check alignment of pointers before casting
     if(!isAligned(a, sizeof(Ti)) || !isAligned(b, sizeof(Ti)) || !isAligned(c, sizeof(Ti))
        || !isAligned(d, sizeof(To)))
@@ -153,6 +177,8 @@ rocblaslt_status rocblaslt_matmul_typecasting(rocblaslt_handle             handl
         std::cerr << "memmory is not aligned" << std::endl;
         return rocblaslt_status_invalid_size;
     }
+    // gpu_time_used = get_time_us_no_sync2() - gpu_time_used;
+    // std::cout << "rocblaslt_matmul_template:" << gpu_time_used << std::endl;
     return rocblaslt_batched_template(handle,
                                       trans_a,
                                       trans_b,
@@ -229,6 +255,10 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
                                                   rocblaslt_epilogue           epilogue,
                                                   hipStream_t                  stream)
 {
+    // double gpu_time_used;
+    // gpu_time_used = 0.0;
+    // gpu_time_used = get_time_us_no_sync2(); // in microseconds
+    
     rocblaslt_status rs_status = rocblaslt_status_not_implemented;
 
 #define EX_TYPECASTING_PARM                                                               \
@@ -275,6 +305,8 @@ inline rocblaslt_status rocblaslt_matmul_template(rocblaslt_handle             h
         rs_status = rocblaslt_status_not_implemented;
     }
 
+    // gpu_time_used = get_time_us_no_sync2() - gpu_time_used;
+    // std::cout << "rocblaslt_matmul_template:" << gpu_time_used << std::endl;
     return rs_status;
 }
 #endif

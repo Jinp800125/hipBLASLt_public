@@ -56,6 +56,9 @@ rocblaslt_status rocblaslt_matmul_impl(const rocblaslt_handle       handle,
                                        size_t                       workspaceSizeInBytes,
                                        hipStream_t                  stream)
 {
+    // double gpu_time_used;
+    // gpu_time_used = 0.0;
+    // gpu_time_used = get_time_us_no_sync2(); // in microseconds
     hipblasOperation_t     opA          = matmul_descr->op_A;
     hipblasOperation_t     opB          = matmul_descr->op_B;
     rocblaslt_compute_type compute_type = matmul_descr->compute_type;
@@ -66,8 +69,8 @@ rocblaslt_status rocblaslt_matmul_impl(const rocblaslt_handle       handle,
     if(is_bias_enabled(epilogue))
         bias = matmul_descr->bias;
 
-    const void* scaleD = nullptr;
-    if(matmul_descr->scaleD)
+    const void *scaleD = nullptr;
+    if (matmul_descr->scaleD)
         scaleD = matmul_descr->scaleD;
 
     // matrix A
@@ -136,6 +139,8 @@ rocblaslt_status rocblaslt_matmul_impl(const rocblaslt_handle       handle,
         batch_stride_d, 0, num_batches_a, true, compute_type, algo, workspace,           \
         workspaceSizeInBytes, bias, scaleD, bias_type, epilogue, stream
 
+    // gpu_time_used = get_time_us_no_sync2() - gpu_time_used;
+    // std::cout << "rocblaslt_matmul_impl:" << gpu_time_used << std::endl;
     return rocblaslt_matmul_template(EX_PARM);
 }
 
@@ -160,6 +165,10 @@ rocblaslt_status rocblaslt_matmul(rocblaslt_handle             handle,
                                   hipStream_t                  stream)
 
 {
+    // double gpu_time_used;
+    // gpu_time_used = 0.0;
+    // gpu_time_used = get_time_us_no_sync2(); // in microseconds
+
     // Check if handle is valid
     if(handle == nullptr || matmul_descr == nullptr || matA == nullptr || matB == nullptr
        || matC == nullptr || matD == nullptr)
@@ -219,21 +228,26 @@ rocblaslt_status rocblaslt_matmul(rocblaslt_handle             handle,
               "A",
               A,
               "Adesc",
-              rocblaslt_matrix_layout_to_string(matA),
+              "Victor",
+              // rocblaslt_matrix_layout_to_string(matA),
               "B",
               B,
               "Bdesc",
-              rocblaslt_matrix_layout_to_string(matB),
+              "Victor",
+              // rocblaslt_matrix_layout_to_string(matB),
               "C",
               C,
               "Cdesc",
-              rocblaslt_matrix_layout_to_string(matC),
+              "Victor",
+              // rocblaslt_matrix_layout_to_string(matC),
               "D",
               D,
               "Ddesc",
-              rocblaslt_matrix_layout_to_string(matD),
+              "Victor",
+              // rocblaslt_matrix_layout_to_string(matD),
               "computeDesc",
-              rocblaslt_matmul_desc_to_string(matmul_descr),
+              "Victor",
+              // rocblaslt_matmul_desc_to_string(matmul_descr),
               "workSpace",
               workspace,
               "workSpaceSizeInBytes",
@@ -244,6 +258,8 @@ rocblaslt_status rocblaslt_matmul(rocblaslt_handle             handle,
               *(reinterpret_cast<const float*>(beta)),
               "stream",
               stream);
+    // gpu_time_used = get_time_us_no_sync2() - gpu_time_used;
+    // std::cout << "rocblaslt_matmul:" << gpu_time_used << std::endl;
     return rocblaslt_matmul_impl(handle,
                                  matmul_descr,
                                  A,

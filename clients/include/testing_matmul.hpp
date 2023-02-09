@@ -651,7 +651,8 @@ void testing_matmul(const Arguments& arg)
         }
 
         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-        gpu_time_used = get_time_us_sync(stream); // in microseconds
+        hipblaslt_cout << "START" << std::endl;
+        gpu_time_used = get_time_us_sync(); // in microseconds
         for(int i = 0; i < number_hot_calls; i++)
         {
             EXPECT_HIPBLAS_STATUS(hipblasLtMatmul(handle,
@@ -673,7 +674,8 @@ void testing_matmul(const Arguments& arg)
                                   HIPBLAS_STATUS_SUCCESS);
         }
         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-        gpu_time_used = get_time_us_sync(stream) - gpu_time_used;
+        gpu_time_used = get_time_us_sync() - gpu_time_used;
+        hipblaslt_cout << "END" << std::endl;
         auto flops    = gemm_gflop_count<float>(M, N, K);
         switch(arg.activation_type)
         {
