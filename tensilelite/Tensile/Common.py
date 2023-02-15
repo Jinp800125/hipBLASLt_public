@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -113,7 +113,7 @@ globalParameters["UnrollLoopEfficiencyEnable"] = False   # if True split(S) MAC&
 # less common
 ########################################
 globalParameters["CMakeBuildType"] = "Release"            # whether benchmark clients and library client should be release or debug
-globalParameters["PrintSolutionRejectionReason"] = False  # when a solution is marked as invalid, print why
+globalParameters["PrintSolutionRejectionReason"] = True  # when a solution is marked as invalid, print why
 globalParameters["LibraryFormat"] = "yaml"                # set library backend (either yaml or msgpack)
 globalParameters["EmbedLibrary"] = None                   # whether library should be embedded or not
 
@@ -179,7 +179,7 @@ globalParameters["PrintTensorD"] = 0          # Print TensorD.  0x1=after init; 
 globalParameters["PrintTensorRef"] = 0          # Print reference tensor.  0x1=after init; 0x2=after copy-back; 0x3=both
 globalParameters["PrintIndexAssignments"] = 0      # Print the tensor index assignment info
 globalParameters["PrintWinnersOnly"] = False      # Only print the solutions which become the fastest
-globalParameters["PrintCodeCommands"] = False  # print the commands used to generate the code objects (asm,link,hip-clang, etc)
+globalParameters["PrintCodeCommands"] = False  # print the commands used to generate the code objects (asm,link,hip-clang, etc)PrintCodeCommands
 globalParameters["DumpTensors"] = False        # If True, dump tensors to binary files instead of printing them.
 
 # If PrintMax* is greater than the dimension, the middle elements will be repaced with "..."

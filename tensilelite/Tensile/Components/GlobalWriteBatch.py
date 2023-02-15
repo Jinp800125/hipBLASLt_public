@@ -421,7 +421,7 @@ class GlobalWriteBatchWriter:
         self.storesIssued += numNewStores
 
     if self.parentWriter.states.serializedStore:
-      module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
+      module.add(SNop(10, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
 
   def _emitAdd(self, module: Module):
     if self.atomic:
@@ -552,7 +552,7 @@ class GlobalWriteBatchWriter:
 
           waitLoadCntScaleDVskip = waitLoadCnt
           if self.kernel["ProblemType"]["UseScaleD"] and (dataScaleD not in scaleDWaitDict):
-            waitLoadCnt = waitLoadCnt + self.scaleDLoadIssued[elementIdx]
+            waitLoadCnt = waitLoadCnt + self.scaleDLoadIssued[elementIdx] + 1
 
           vmcnt = self.loadsIssued + self.loadsScaleDIssued - waitLoadCnt - 1
 
@@ -621,7 +621,8 @@ class GlobalWriteBatchWriter:
         activationModule.appendModule (copyData(activationCDataType, self.ss.elementSumIdx[elementIdx], self.gwvw, \
           self.activationSetPCStruct.vgprActCopy, 1))
       elif self.parentWriter.insertActivationAfterPacked(self.kernel, self.activationTypeStr):
-        isActivationInsertAfter = True
+        # isActivationInsertAfter = True
+        isActivationInsertAfter = False
         activationModule = self.parentWriter.getActivationDestDataType(self.kernel, self.activation, \
           self.activationTypeStr, self.gwvw, self.ss.elementSumIdx[elementIdx], self.tmpVgpr, self.tmpSgpr)
       else:
@@ -691,7 +692,7 @@ class GlobalWriteBatchWriter:
             elif vi%2 == 1:
               assert (self.gwvw % 2 == 0)
             else:
-              scaleDModule.add(VCmpGtU32(dst=sgpr("AddressScaleD",2), src0=sgpr("SrdScaleD+2"), src1=0, comment=" == 0 ?"))
+              scaleDModule.add(VCmpGtU32(dst=sgpr("AddressScaleD",2), src0=sgpr("SrdScaleD+2"), src1=0, comment=" == 0 ? (%d)"%(isActivationInsertAfter)))
               scaleDModule.add(VCndMaskB32(
                 dst=vgpr(inputScaleDVgpr), \
                 src1=vgpr(inputScaleDVgpr), \
@@ -723,8 +724,8 @@ class GlobalWriteBatchWriter:
             raise RuntimeError("Unsupported scaleD compute data type %s."%str(self.kernel["ProblemType"]["ComputeDataType"]))
 
       if isActivationInsertAfter:
-        module.add(convertModule)
-        module.add(packModule)
+        # module.add(convertModule)
+        # module.add(packModule)
         module.add(activationModule)
         module.add(scaleDModule)
         if self.kernel["ProblemType"]["UseScaleD"] and (self.kernel["GlobalSplitU"] == 1):

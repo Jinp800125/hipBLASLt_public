@@ -245,7 +245,7 @@ def Tensile(userArgs):
         config = LibraryIO.readYAML(configPaths[0])
     # convert alternate format into default format
     else:
-        base = LibraryIO.readYAML(configPaths[0])
+        base = LibraryIO.readYAML(configPaths[0])//readyaml
         sizes = []
         if len(configPaths) == 2:
             sizes = LibraryIO.readYAML(configPaths[1])

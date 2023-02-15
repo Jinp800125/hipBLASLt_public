@@ -218,6 +218,7 @@ class ActivationModule:
         self.resetGprCounter()
         if (activationType == 'abs'):
             module = self.getAbsModule(cDataType, vgprIdx)
+            # module.add(self.getAbsModule(cDataType, vgprIdx+1))
         elif (activationType == 'clippedrelu'):
             module = self.getClippedReluModule(cDataType, vgprIdx, "activationAlpha", "activationBeta")
         elif (activationType == 'exp'):
@@ -228,6 +229,7 @@ class ActivationModule:
             module = self.getLeakyReluModule(cDataType, vgprIdx, "activationAlpha")
         elif (activationType == 'relu'):
             module = self.getReluModule(cDataType, vgprIdx)
+            # module.add(self.getReluModule(cDataType, vgprIdx+1))
         elif (activationType == 'sigmoid'):
             module = self.getSigmoidModule(cDataType, vgprIdx)
         elif (activationType == 'tanh'):
@@ -313,8 +315,9 @@ class ActivationModule:
     def getAbsModule(self, cDataType, vgprIdx):
         module = Module("Abs")
         if cDataType.isHalf() or cDataType.isBFloat16():
-            absMagic = "0x7fff7fff" if self.usePK else "0x7fff"
-            module.add(VAndB32(dst=self.vgprPrefix(vgprIdx), src0=absMagic, src1=self.vgprPrefix(vgprIdx), comment="Remove sign bit"))
+            # absMagic = "0x7fff7fff" if self.usePK else "0x7fff"
+            # module.add(VAndB32(dst=self.vgprPrefix(vgprIdx), src0=absMagic, src1=self.vgprPrefix(vgprIdx), comment="Remove sign bit"))
+            module.add(VAndB32(dst=self.vgprPrefix("ValuC+%d"%vgprIdx), src0="0x7fffffff", src1=self.vgprPrefix("ValuC+%d"%vgprIdx), comment="Remove sign bit"))
         elif cDataType.isSingle():
             module.add(VAndB32(dst=self.vgprPrefix(vgprIdx), src0="0x7fffffff", src1=self.vgprPrefix(vgprIdx), comment="Remove sign bit"))
         elif cDataType.isDouble():
@@ -473,7 +476,8 @@ class ActivationModule:
     def getReluModule(self, cDataType, vgprIdx):
         module = Module("LeakyRelu")
         if cDataType.isHalf():
-            module.add(VMaxPKF16(dst=self.vgprPrefix(vgprIdx), src0=self.vgprPrefix(vgprIdx), src1=0, comment="x = max(0, x)" ))
+            # module.add(VMaxPKF16(dst=self.vgprPrefix(vgprIdx), src0=self.vgprPrefix(vgprIdx), src1=0, comment="x = max(0, x)" ))
+            module.add(VMaxF32(dst=self.vgprPrefix("ValuC+%d"%vgprIdx), src0=self.vgprPrefix("ValuC+%d"%vgprIdx), src1=0, comment="x = max(0, x)" ))
         elif cDataType.isSingle():
             module.add(VMaxF32(dst=self.vgprPrefix(vgprIdx), src0=self.vgprPrefix(vgprIdx), src1=0, comment="x = max(0, x)" ))
         elif cDataType.isDouble():

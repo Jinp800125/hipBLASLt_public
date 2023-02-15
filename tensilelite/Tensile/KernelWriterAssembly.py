@@ -7207,6 +7207,7 @@ class KernelWriterAssembly(KernelWriter):
   def getActivationDestDataType(self, kernel, activation, activationTypeStr: str, gwvw, \
   elementSumIdx, tmpVgpr, tmpSgpr):
     module = Module("ActivationAfterPack")
+    willbepacked = False
     for vi in range(0, gwvw):
       sumIdxV = elementSumIdx + vi
       if kernel["ProblemType"]["DestDataType"].isHalf() or \
@@ -7220,11 +7221,16 @@ class KernelWriterAssembly(KernelWriter):
             assert (gwvw % 2 == 0)
           else:
             continue
-          vgprIdx = elementSumIdx + vi//2
+          # vgprIdx = elementSumIdx + vi//2
+          # vgprIdx = elementSumIdx + vi
+
+          vgprIdx = sumIdxV - self.states.c.startVgprValu - 1
+          willbepacked = True
         else:
           if (sumIdxV % 2 != 0):
             continue
           vgprIdx = sumIdxV // 2
+          # vgprIdx = sumIdxV
       elif kernel["ProblemType"]["DestDataType"].isSingle():
         vgprIdx = sumIdxV
       elif kernel["ProblemType"]["DestDataType"].isDouble():
@@ -7233,8 +7239,11 @@ class KernelWriterAssembly(KernelWriter):
         vgprIdx = sumIdxV
       else:
         raise RuntimeError("Unsupported data type %s for activation vgpr index."%str(self.states.kernel["ProblemType"]["DestDataType"]))
+
       # Here we still use DestDataType cause the data is ready to be written to global
       actModule = activation.getModule(self.states.kernel["ProblemType"]["DestDataType"], activationTypeStr, vgprIdx)
+      if willbepacked:
+        actModule.add(activation.getModule(self.states.kernel["ProblemType"]["DestDataType"], activationTypeStr, vgprIdx+1))
       module.add(activation.assignGpr(actModule, tmpVgpr, tmpSgpr))
       activation.setUsePK(True)
     return module

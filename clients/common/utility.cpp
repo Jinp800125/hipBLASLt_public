@@ -117,11 +117,10 @@ double get_time_us_sync_device(void)
 /*! \brief  CPU Timer(in microsecond): synchronize with given queue/stream and return wall time */
 double get_time_us_sync()
 {
-    // hipblaslt_cerr << "Synchronizing device failed" << std::endl;
-    // if(hipDeviceSynchronize() != hipSuccess)
-    // {
-    //     hipblaslt_cerr << "Synchronizing device failed" << std::endl;
-    // }
+    if(hipDeviceSynchronize() != hipSuccess)
+    {
+        hipblaslt_cerr << "Synchronizing device failed" << std::endl;
+    }
 
     auto now = std::chrono::steady_clock::now();
     // now.time_since_epoch() is the duration since epoch

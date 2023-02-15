@@ -64,9 +64,9 @@
 #define DIM2 1024
 #define DIM3 1024
 #define BATCH_COUNT 1
-#define ALPHA 2
-#define BETA 3
-#define BENCH_LOOP_COUNT 3
+#define ALPHA 1
+#define BETA 0
+#define BENCH_LOOP_COUNT 20
 
 typedef enum _ActivationType
 {
@@ -214,6 +214,24 @@ void mat_mul_bias_activation(Tc             alpha,
         }
     }
 }
+
+/*! \brief  CPU Timer(in microsecond): synchronize with given queue/stream and return wall time */
+double get_time_us_sync(hipStream_t stream)
+{
+    hipStreamSynchronize(stream);
+
+    if(hipDeviceSynchronize() != hipSuccess)
+    {
+        std::cout << "Synchronizing device failed" << std::endl;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    // now.time_since_epoch() is the duration since epoch
+    // which is converted to microseconds
+    auto duration
+        = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+    return (static_cast<double>(duration));
+};
 
 // cppcheck-suppress constParameter
 static void show_usage(char* argv[])
@@ -783,11 +801,33 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
     std::string timing_string;
     if(timing)
     {
-        hipEvent_t start, stop;
-        hipEventCreate(&start);
-        hipEventCreate(&stop);
-        float eventMs = 1.0f;
-        hipEventRecord(start, stream);
+        // hipEvent_t start, stop;
+        // hipEventCreate(&start);
+        // hipEventCreate(&stop);
+        double eventMs = 0;
+
+        for(int loop = 0; loop < 5; loop++)
+        {
+            CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
+                                                  matmul,
+                                                  &alpha,
+                                                  da,
+                                                  matA,
+                                                  db,
+                                                  matB,
+                                                  &beta,
+                                                  dc,
+                                                  matC,
+                                                  dd,
+                                                  matD,
+                                                  &heuristicResult[0].algo,
+                                                  d_workspace,
+                                                  workspace_size,
+                                                  stream));
+        }
+
+        // hipEventRecord(start, stream);
+        eventMs = get_time_us_sync(stream); // in microseconds
         for(int loop = 0; loop < BENCH_LOOP_COUNT; loop++)
         {
             CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
@@ -807,14 +847,15 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
                                                   workspace_size,
                                                   stream));
         }
-        hipEventRecord(stop, stream);
-        hipEventSynchronize(stop);
-        hipEventElapsedTime(&eventMs, start, stop);
-        hipEventDestroy(start);
-        hipEventDestroy(stop);
+        eventMs = get_time_us_sync(stream) - eventMs;
+        // hipEventRecord(stop, stream);
+        // hipEventSynchronize(stop);
+        // hipEventElapsedTime(&eventMs, start, stop);
+        // hipEventDestroy(start);
+        // hipEventDestroy(stop);
         eventMs /= BENCH_LOOP_COUNT;
         double flops  = 2 * m * n * k * batch_count;
-        double tflops = flops / eventMs / 1000000000;
+        double tflops = flops / eventMs / 1000000;
         timing_string
             = timing_string + ", " + std::to_string(eventMs) + ", " + std::to_string(tflops);
     }

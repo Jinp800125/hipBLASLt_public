@@ -655,7 +655,7 @@ void testing_matmul(const Arguments& arg)
         gpu_time_used = get_time_us_sync(); // in microseconds
         for(int i = 0; i < number_hot_calls; i++)
         {
-            EXPECT_HIPBLAS_STATUS(hipblasLtMatmul(handle,
+            CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
                                                   matmul,
                                                   &h_alpha,
                                                   dA,
@@ -670,8 +670,24 @@ void testing_matmul(const Arguments& arg)
                                                   &heuristicResult[0].algo,
                                                   dWorkspace,
                                                   workspace_size,
-                                                  stream),
-                                  HIPBLAS_STATUS_SUCCESS);
+                                                  stream));
+            // EXPECT_HIPBLAS_STATUS(hipblasLtMatmul(handle,
+            //                                       matmul,
+            //                                       &h_alpha,
+            //                                       dA,
+            //                                       matA,
+            //                                       dB,
+            //                                       matB,
+            //                                       &h_beta,
+            //                                       dC,
+            //                                       matC,
+            //                                       dD,
+            //                                       matD,
+            //                                       &heuristicResult[0].algo,
+            //                                       dWorkspace,
+            //                                       workspace_size,
+            //                                       stream),
+            //                       HIPBLAS_STATUS_SUCCESS);
         }
         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
         gpu_time_used = get_time_us_sync() - gpu_time_used;
