@@ -1266,23 +1266,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     ####################################
     # Local Write Addresses
     ####################################
-    module.addComment2("Local Write Addresses")
-
-    # tile assignments
-    module.add(self.lwaTileAssignment(tensorParametersA))
-    module.add(self.lwaTileAssignment(tensorParametersB))
-
-    # unroll assignments
-    module.add(self.lwaUnrollAssignment(kernel, tensorParametersA))
-    module.add(self.lwaUnrollAssignment(kernel, tensorParametersB))
-
-    # first offsets
-    module.addComment1("local write addresses: first offset a")
-    module.add(self.lwaFirstOffset(kernel, tensorParametersA))
-    module.addComment1("local write addresses: first offset b")
-    module.add(self.lwaFirstOffset(kernel, tensorParametersB))
-    self.dontAppendCode = False
-    self.dontAppendCode = self.dontAppendCode or forceNoTileCode
 
     ###########################################################################
     # summations loops: open
@@ -1323,9 +1306,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.addComment0("local read addresses: init pointers b")
     module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersB))
 
-    ####################################
-    # prefetch: unrolled loop prefix
-    ####################################
+    # ####################################
+    # # prefetch: unrolled loop prefix
+    # ####################################
     if kernel["PrefetchGlobalRead"]:
       pfi = 1
       module.addComment1("prefetch: global -> local")
@@ -1342,6 +1325,103 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters2nd, 0))
       module.add(self.globalReadIncrementAB(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, pfi))
+    module.addComment2("Local Write Addresses")
+
+    # tile assignments
+    module.add(self.lwaTileAssignment(tensorParametersA))
+    module.add(self.lwaTileAssignment(tensorParametersB))
+
+    # unroll assignments
+    module.add(self.lwaUnrollAssignment(kernel, tensorParametersA))
+    module.add(self.lwaUnrollAssignment(kernel, tensorParametersB))
+
+    # first offsets
+    module.addComment1("local write addresses: first offset a")
+    module.add(self.lwaFirstOffset(kernel, tensorParametersA))
+    module.addComment1("local write addresses: first offset b")
+    module.add(self.lwaFirstOffset(kernel, tensorParametersB))
+    self.dontAppendCode = False
+    self.dontAppendCode = self.dontAppendCode or forceNoTileCode
+
+    ####################################
+    # Local Read Addresses
+    ####################################
+    module.addComment2("Local Read Addresses")
+
+    # tile assignments
+    module.addComment1("local read addresses: tile assignments a/b")
+    module.add(self.lraTileAssignment(kernel, tensorParametersA, tensorParametersB))
+
+    # final offsets
+    module.addComment1("local read addresses: final offsets a")
+    module.add(self.lraFinalOffset(kernel, tensorParametersA))
+    module.addComment1("local read addresses: final offsets b")
+    module.add(self.lraFinalOffset(kernel, tensorParametersB))
+
+    # declare addresses
+    module.addComment1("local read addresses: declare addresses a")
+    module.add(self.lraDeclareAddresses(kernel, tensorParametersA))
+    module.addComment1("local read addresses: declare addresses b")
+    module.add(self.lraDeclareAddresses(kernel, tensorParametersB))
+
+    # ###########################################################################
+    # # summations loops: open
+    # ###########################################################################
+
+    # # declare loop num iter
+    # if not forceNoTileCode:
+    #   module.addComment0("declare loop num iterations")
+
+    # # perform initC in the shadow of the prefetch
+    # # Prefetch occurs at start of unroll loop
+    # # If we have multiple summation indices (otherSummationLoops>0),
+    # # we can't init in shadow of this prefetch
+    # # since that would initC inside the other summation loops
+
+    # if self.states.doShadowInit != 2:
+    #   module.add(self.initC(kernel))
+
+    # # open non-unrolled summation loops
+    # if not forceNoTileCode:
+    #   for i in range(kernel["ProblemType"]["NumIndicesSummation"]-1):
+    #     module.addComment1("summation loop %u"%i)
+    #     module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, i))
+    #     if self.states.actualSummationLoops>1:
+    #       module.add(self.openLoop(kernel, tensorParametersA, tensorParametersB, i))
+    #   module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx))
+
+    # if not forceNoTileCode:
+    #   if self.states.staggerU:
+    #     module.add(self.declareStaggerParms(kernel))
+    #     module.add(self.calculateStagger(kernel, tensorParametersA))
+    #     module.add(self.calculateStagger(kernel, tensorParametersB))
+
+    # # LRO and LWA as assigned
+    # # init lds read pointers before each unrolled loop
+    # module.addComment0("local read addresses: init pointers a")
+    # module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersA))
+    # module.addComment0("local read addresses: init pointers b")
+    # module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersB))
+
+    # ####################################
+    # # prefetch: unrolled loop prefix
+    # ####################################
+    # if kernel["PrefetchGlobalRead"]:
+    #   pfi = 1
+    #   module.addComment1("prefetch: global -> local")
+    #   module.add(self.openSumAtLeastUnroll(kernel, prefetch=True, isOptNLL=isOptNLL))
+    #   # if DirectToVgprA is enabled, swap the order of global read (B->A)
+    #   tensorParameters1st = tensorParametersA
+    #   tensorParameters2nd = tensorParametersB
+    #   if kernel["DirectToVgprA"]:
+    #     tensorParameters1st, tensorParameters2nd = tensorParameters2nd, tensorParameters1st
+    #   moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st, usePlaceHolder=False)
+    #   module.add(replaceHolder(moduleTmp, 0))
+    #   module.add(self.globalReadDo(kernel, 0, tensorParameters1st, 0))
+    #   moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd, usePlaceHolder=False)
+    #   module.add(replaceHolder(moduleTmp, 0))
+    #   module.add(self.globalReadDo(kernel, 0, tensorParameters2nd, 0))
+    #   module.add(self.globalReadIncrementAB(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, pfi))
 
     module.addComment2("End setupNewTile")
 
@@ -1993,26 +2073,26 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module = Module("body")
     module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB))
 
-    ####################################
-    # Local Read Addresses
-    ####################################
-    module.addComment2("Local Read Addresses")
+    # ####################################
+    # # Local Read Addresses
+    # ####################################
+    # module.addComment2("Local Read Addresses")
 
-    # tile assignments
-    module.addComment1("local read addresses: tile assignments a/b")
-    module.add(self.lraTileAssignment(kernel, tensorParametersA, tensorParametersB))
+    # # tile assignments
+    # module.addComment1("local read addresses: tile assignments a/b")
+    # module.add(self.lraTileAssignment(kernel, tensorParametersA, tensorParametersB))
 
-    # final offsets
-    module.addComment1("local read addresses: final offsets a")
-    module.add(self.lraFinalOffset(kernel, tensorParametersA))
-    module.addComment1("local read addresses: final offsets b")
-    module.add(self.lraFinalOffset(kernel, tensorParametersB))
+    # # final offsets
+    # module.addComment1("local read addresses: final offsets a")
+    # module.add(self.lraFinalOffset(kernel, tensorParametersA))
+    # module.addComment1("local read addresses: final offsets b")
+    # module.add(self.lraFinalOffset(kernel, tensorParametersB))
 
-    # declare addresses
-    module.addComment1("local read addresses: declare addresses a")
-    module.add(self.lraDeclareAddresses(kernel, tensorParametersA))
-    module.addComment1("local read addresses: declare addresses b")
-    module.add(self.lraDeclareAddresses(kernel, tensorParametersB))
+    # # declare addresses
+    # module.addComment1("local read addresses: declare addresses a")
+    # module.add(self.lraDeclareAddresses(kernel, tensorParametersA))
+    # module.addComment1("local read addresses: declare addresses b")
+    # module.add(self.lraDeclareAddresses(kernel, tensorParametersB))
 
     module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False))
 

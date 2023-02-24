@@ -971,6 +971,10 @@ class KernelWriterAssembly(KernelWriter):
       if kernel.enabledSetPrioSplitLDS:
         moduleArgs.add(SSetPrior(prior=1, comment="prioritize init code so as to issue load sooner"))
       moduleArgs.add(SWaitCnt(lgkmcnt=0, comment="wait for %u bytes of kern args" % self.argLoader.getOffset()))
+      # loadtimes = self.states.numSgprToLoad/16
+      # if not self.states.numSgprToLoad%16:
+      #   loadtimes = loadtimes-1
+      # moduleArgs.add(SWaitCnt(lgkmcnt=loadtimes, comment="wait for %u bytes of kern args" % self.argLoader.getOffset()))
 
       if not kernel["ProblemType"]["StridedBatched"]:
         with self.allocTmpSgpr(self.states.laneSGPRCount) as tmpSgpr:
@@ -1066,8 +1070,8 @@ class KernelWriterAssembly(KernelWriter):
     if not kernel["_GlobalAccumulation"]:
       addOffset2Buffer(module, "D", log2(self.states.bpeCexternal))
       addOffset2Buffer(module, "C", log2(self.states.bpeCexternal))
-    addOffset2Buffer(module, "A", log2(self.states.bpeAB))
-    addOffset2Buffer(module, "B", log2(self.states.bpeAB))
+    # addOffset2Buffer(module, "A", log2(self.states.bpeAB))
+    # addOffset2Buffer(module, "B", log2(self.states.bpeAB))
 
     # self.states.groOffsetInMacroTile == 1 case, subtract pre-pad here
     if self.states.groOffsetInMacroTile:
