@@ -322,6 +322,11 @@ namespace Tensile
             args.template append<void const*>("scaleDVec", inputs.scaleDVec);
         }
 
+        if(problemType.useScaleAlphaVec && (sizeMapping.globalSplitU == 1)) //kernel input data
+        {
+            args.template append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
+        }
+
         size_t startStrideCD = problemType.useInitialStridesCD ? 0 : 1;
         size_t startStrideAB = problemType.useInitialStridesAB ? 0 : 1;
 
@@ -722,6 +727,10 @@ namespace Tensile
         {
             rv.args.append<void const*>("scaleDVec", inputs.scaleDVec);
         }
+        if(problemType.useScaleAlphaVec && sizeMapping.globalAccumulation == 0)
+        {
+            rv.args.append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
+        }
 
         if(sizeMapping.globalAccumulation)
         {
@@ -860,6 +869,10 @@ namespace Tensile
         if(problemType.useScaleDVec) // GSU dep
         {
             args.template append<void const*>("scaleDVec", inputs.scaleDVec);
+        }
+        if(problemType.useScaleAlphaVec) // GSU dep
+        {
+            args.template append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
         }
 
         if(sizeMapping.globalAccumulation == 2)
@@ -1177,6 +1190,10 @@ namespace Tensile
         if(problemType.useScaleDVec)
         {
             name += ("_ScaleDVec");
+        }
+        if(problemType.useScaleAlphaVec)
+        {
+            name += ("_ScaleAlphaVec");
         }
 
         name += "_PostGSU" + std::to_string(gsu);

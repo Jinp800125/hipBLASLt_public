@@ -65,7 +65,7 @@ class BoundIndex:
 
 class ProblemType:
     StateKeys = ['operationIdentifier', 'transA', 'transB', 'aType', 'bType', 'cType', 'dType', 'eType', 'computeType',
-                 'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleDVec', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
+                 'useBeta', 'useBias', 'biasSrcWhiteList', 'useE', 'useScaleDVec', 'useScaleAlphaVec', 'biasDataTypeWhiteList', 'highPrecisionAccumulate',
                  'useInitialStridesAB', 'useInitialStridesCD', 'stridedBatched', 'groupedGemm',
                  'useGradient', 'activationType', 'activationHPA', 'activationNoGuard', 'sparseA', 'f32XdlMathOp']
     @classmethod
@@ -197,6 +197,10 @@ class ProblemType:
         if 'UseScaleDVec' in d:
             rv.useScaleDVec = d['UseScaleDVec']
 
+        rv.useScaleAlphaVec = False
+        if 'UseScaleAlphaVec' in d:
+            rv.useScaleAlphaVec = d['UseScaleAlphaVec']
+
         rv.batched = d['Batched']
 
         rv.activationType = ActivationType('none')
@@ -314,6 +318,7 @@ class ProblemType:
                 enumList = [actEnum.capitalize() for actEnum in ActivationType.getEnumStrList(self.activationComputeDataType, exportType=exportType)]
                 predicates.append(ProblemPredicate("ActivationEnumWhiteList", value=enumList))
             # predicates.append(ProblemPredicate("UseScaleDVec", value=self.useScaleDVec))
+            # predicates.append(ProblemPredicate("UseScaleAlphaVec", value=self.useScaleAlphaVec))
             # predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
 
         if includeType:
@@ -328,6 +333,7 @@ class ProblemType:
             predicates.append(ProblemPredicate("StridedBatched", value=self.stridedBatched))
             predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
             predicates.append(ProblemPredicate("UseScaleDVec", value=self.useScaleDVec))
+            predicates.append(ProblemPredicate("UseScaleAlphaVec", value=self.useScaleAlphaVec))
             predicates.append(ProblemPredicate("SparseA", value=self.sparseA))
             predicates.append(ProblemPredicate("F32XdlMathOp", value=self.f32XdlMathOp))
 

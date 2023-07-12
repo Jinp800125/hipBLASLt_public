@@ -39,19 +39,19 @@ class GlobalWriteBatchComponent(GlobalWriteComponents):
   kernel = {"ProblemType": {"OperationType": "GEMM" }}
   def __call__(self, kernel: Solution, tPA, tPB, activation: ActivationModule, ss: StoreState, \
     batchIdx, applyAlpha, beta, edge, atomic, gwvw, atomicW, \
-    batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, biasLocalBarrierInit: bool, \
+    batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, addrScaleAlphaVec, biasLocalBarrierInit: bool, \
     tmpVgpr, bf16CVTVgprStruct, activationSetPCStruct, activationTypeStr, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeMulAlpha, \
     packdata, parentWriter) -> Module:
     return GlobalWriteBatchWriter(kernel, tPA, tPB, activation, ss, batchIdx, applyAlpha, \
       beta, edge, atomic, gwvw, atomicW, \
-      batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, biasLocalBarrierInit, \
+      batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, addrScaleAlphaVec, biasLocalBarrierInit, \
       tmpVgpr, bf16CVTVgprStruct, activationSetPCStruct, activationTypeStr, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeMulAlpha, \
       packdata, parentWriter).emit()
 
 class GlobalWriteBatchWriter:
   def __init__(self, kernel: Solution, tPA, tPB, activation: ActivationModule, ss: StoreState, \
     batchIdx, applyAlpha, beta, edge, atomic, gwvw, atomicW, \
-    batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, biasLocalBarrierInit: bool, \
+    batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, addrScaleAlphaVec, biasLocalBarrierInit: bool, \
     tmpVgpr, bf16CVTVgprStruct, activationSetPCStruct, activationTypeStr, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeMulAlpha, \
       packdata, parentWriter):
     self.kernel = kernel
@@ -72,6 +72,7 @@ class GlobalWriteBatchWriter:
     self.addrC    = addrC
     self.addrBias = addrBias
     self.addrScaleDVec = addrScaleDVec
+    self.addrScaleAlphaVec = addrScaleAlphaVec
     self.biasLocalBarrierInit  = biasLocalBarrierInit
     self.activationSetPCStruct = activationSetPCStruct
     self.activationTypeStr     = activationTypeStr
@@ -208,6 +209,7 @@ class GlobalWriteBatchWriter:
     self.localLoadIssued = 0
     self.storesIssued    = 0
     self.loadsScaleDVecIssued     = 0
+    self.loadsScaleAlphaVecIssued     = 0
 
     ########################################
     # calculate addr and masks
@@ -244,8 +246,10 @@ class GlobalWriteBatchWriter:
 
     self.biasLoadIssued = []
     self.scaleDVecLoadIssued = []
+    self.scaleAlphaVecLoadIssued = []
     loadedDataBias = {}
     loadedDataScaleDVec = {}
+    loadedDataScaleAlphaVec = {}
     for elementIdx, element in enumerate(self.batchElements):
       addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
       addrCVgpr    = addrCalc.addrCVgpr
@@ -253,10 +257,12 @@ class GlobalWriteBatchWriter:
       addrEVgpr    = addrCalc.addrEVgpr
       addrBiasVgpr = addrCalc.addrBiasVgpr
       addrScaleDVecVgpr = addrCalc.addrScaleDVecVgpr
+      addrScaleAlphaVecVgpr = addrCalc.addrScaleAlphaVecVgpr
       data     = self.ss.elementData[elementIdx]
       dataE    = self.ss.elementDataE[elementIdx]
       dataBias = self.ss.elementDataBias[elementIdx]
       dataScaleDVec = self.ss.elementDataScaleDVec[elementIdx]
+      dataScaleAlphaVec = self.ss.elementDataScaleAlphaVec[elementIdx]
       mask     = self.ss.elementMask[elementIdx]
       vc0 = element[3]
 
@@ -318,6 +324,21 @@ class GlobalWriteBatchWriter:
           loadedDataScaleDVec[dataScaleDVec] = 1
           self.loadsScaleDVecIssued += 1
       self.scaleDVecLoadIssued.append(len(loadedDataScaleDVec))
+      if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+        module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'ScaleAlphaVec', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrScaleDVecVgpr, self.addrScaleDVec))
+        if dataScaleAlphaVec not in loadedDataScaleAlphaVec:
+          # Shift right several vgprs for cvt ops if needed
+          numVgprs = int(ceil(self.kernel["ProblemType"]["ComputeDataType"].numRegisters() * self.ss.cfg.gwvw))
+          reg = self.kernel["ProblemType"]["ComputeDataType"].numRegisters() if self.kernel["ProblemType"]["ComputeDataType"].numRegisters() >= 1 else 1
+          gprShiftScaleAlphaVec = dataScaleAlphaVec + (self.ss.cfg.gwvw * reg - numVgprs)
+          if self.kernel["GroupLoadStore"]:
+            # Group scaleAlphaVec load with C input to
+            loadInputCode.add(self.parentWriter.addScaleAlphaVecLoad(self.kernel, self.ss, addrCalc, gprShiftScaleAlphaVec))
+          else:
+            module.add(self.parentWriter.addScaleAlphaVecLoad(self.kernel, self.ss, addrCalc, gprShiftScaleAlphaVec))
+          loadedDataScaleAlphaVec[dataScaleAlphaVec] = 1
+          self.loadsScaleAlphaVecIssued += 1
+      self.scaleAlphaVecLoadIssued.append(len(loadedDataScaleAlphaVec))
 
       if (self.kernel["ProblemType"]["UseE"] and not self.kernel["ProblemType"]["Gradient"]) and (self.kernel["GlobalSplitU"] == 1):
         module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'E', self.edge, self.beta, mask, (elementIdx == len(self.batchElements) - 1), self.tmpVgpr, self.tmpSgpr, addrEVgpr, self.addrE))
@@ -405,6 +426,7 @@ class GlobalWriteBatchWriter:
     lastDataE       = -1
     checkedDataBias = {}
     checkedDataScaleDVec = {}
+    checkedDataScaleAlphaVec = {}
     for elementIdx in range(len(self.batchElements)):
       if not self.ss.sharedColDVgprs:
         addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
@@ -413,6 +435,7 @@ class GlobalWriteBatchWriter:
         addrCVgpr    = addrCalc.addrCVgpr
         addrBiasVgpr = addrCalc.addrBiasVgpr
         addrScaleDVecVgpr = addrCalc.addrScaleDVecVgpr
+        addrScaleAlphaVecVgpr = addrCalc.addrScaleAlphaVecVgpr
         if addrEVgpr != None:
           self.parentWriter.vgprPool.checkIn(addrEVgpr)
         self.parentWriter.vgprPool.checkIn(addrDVgpr)
@@ -422,6 +445,8 @@ class GlobalWriteBatchWriter:
           self.parentWriter.vgprPool.checkIn(addrBiasVgpr)
         if addrScaleDVecVgpr != None:
           self.parentWriter.vgprPool.checkIn(addrScaleDVecVgpr)
+        if addrScaleAlphaVecVgpr != None:
+          self.parentWriter.vgprPool.checkIn(addrScaleAlphaVecVgpr)
 
       data = self.ss.elementData[elementIdx]
       if data != 0:
@@ -446,6 +471,11 @@ class GlobalWriteBatchWriter:
         if dataScaleDVec not in checkedDataScaleDVec:
           self.parentWriter.vgprPool.checkIn(dataScaleDVec)
         checkedDataScaleDVec[dataScaleDVec] = 1
+      dataScaleAlphaVec = self.ss.elementDataScaleAlphaVec[elementIdx]
+      if dataScaleAlphaVec != 0:
+        if dataScaleAlphaVec not in checkedDataScaleAlphaVec:
+          self.parentWriter.vgprPool.checkIn(dataScaleAlphaVec)
+        checkedDataScaleAlphaVec[dataScaleAlphaVec] = 1
 
     self.ss.firstBatch = False
     self.ss.checkInTempVgprC()
@@ -511,6 +541,9 @@ class GlobalWriteBatchWriter:
       if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
         vmcnt = 0
         commentList.append("ScaleDVec")
+      if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+        vmcnt = 0
+        commentList.append("ScaleAlphaVec")
       # Local read wait
       if self.parentWriter.states.useBias == DataDirection.READ:
         lgkmcnt = 0
@@ -533,7 +566,7 @@ class GlobalWriteBatchWriter:
       module.add(VMovB32(vgpr(self.bf16CVTVgprStruct.vgprBf16Inc), "0x7fff", "rounding bias for bfloat16" ))
 
     storeCode = Module("GroupLoadStore")
-    waitCnter = [self.loadsIssued + self.loadsScaleDVecIssued, self.localLoadIssued]
+    waitCnter = [self.loadsIssued + self.loadsScaleDVecIssued + self.loadsScaleAlphaVecIssued, self.localLoadIssued]
     for elementIdx in range(0, len(self.batchElements)):
       element = self.batchElements[elementIdx]
       addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
@@ -541,6 +574,7 @@ class GlobalWriteBatchWriter:
       dataE = self.ss.elementDataE[elementIdx]
       dataBias = self.ss.elementDataBias[elementIdx]
       dataScaleDVec = self.ss.elementDataScaleDVec[elementIdx]
+      dataScaleAlphaVec = self.ss.elementDataScaleAlphaVec[elementIdx]
       mask = self.ss.elementMask[elementIdx]
       vc0 = element[3]
       sumIdx = self.ss.elementSumIdx[elementIdx]
@@ -582,13 +616,16 @@ class GlobalWriteBatchWriter:
         if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
           waitLoadCnt += self.scaleDVecLoadIssued[elementIdx]
           waitLoadCntStrList.append("%d (scaleDVec)"%self.scaleDVecLoadIssued[elementIdx])
+        if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+          waitLoadCnt += self.scaleAlphaVecLoadIssued[elementIdx]
+          waitLoadCntStrList.append("%d (scaleAlphaVec)"%self.scaleAlphaVecLoadIssued[elementIdx])
         # Calculate local loads
         if self.parentWriter.states.useBias == DataDirection.READ:
           waitLocalLoadCnt += self.biasLoadIssued[elementIdx]
           waitLocalLoadCntStrList.append("%d (bias)"%self.biasLoadIssued[elementIdx])
         # Get vmcnt and lgkmcnt
         if waitCnter[0] > 0: # Check if global load issued > 0
-          vmcnt = self.loadsIssued + self.loadsScaleDVecIssued - waitLoadCnt
+          vmcnt = self.loadsIssued + self.loadsScaleDVecIssued + self.loadsScaleAlphaVecIssued- waitLoadCnt
           if waitCnter[0] == vmcnt: # No need to wait if the global load cnt doesn't change
             vmcnt = -1
           waitCnter[0] = vmcnt
@@ -616,7 +653,7 @@ class GlobalWriteBatchWriter:
             tmp = ""
             for cntStr in waitLoadCntStrList:
               tmp += " - %s"%cntStr
-            comment = "vmcnt(%s) = %d%s"%(vmcnt, self.loadsIssued + self.loadsScaleDVecIssued, tmp)
+            comment = "vmcnt(%s) = %d%s"%(vmcnt, self.loadsIssued + self.loadsScaleDVecIssued + self.loadsScaleAlphaVecIssued, tmp)
           if lgkmcnt != -1:
             tmp = ""
             for cntStr in waitLocalLoadCntStrList:
@@ -624,6 +661,75 @@ class GlobalWriteBatchWriter:
             comment = comment + (" " if comment else "") + "lgkmcnt(%d) = %d%s"%(lgkmcnt, self.localLoadIssued, tmp)
           module.addSpaceLine()
           module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="%s (interleaved)"%comment))
+        else:
+          module.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="%d(interleaved%dVictor)%d"%(lgkmcnt, vmcnt, vscnt)))
+
+      scaleAlphaVecModule = Module("scaleAlphaVecModule")
+      if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+        for vi in range(0, self.gwvw):
+          inputScaleAlphaVecVgpr = dataScaleAlphaVec + vi
+          sumIdxV   = self.ss.elementSumIdx[elementIdx] + vi
+          if self.kernel["ProblemType"]["ComputeDataType"].isSingle():
+            vgprIdx = sumIdxV - self.parentWriter.states.c.startVgprValu
+
+            # Generate single f32 code if edge is detected.
+            if ((vi + 1) == self.gwvw) and ((self.gwvw % 2) == 1):
+
+              scaleAlphaVecModule.add(VCmpGtU32(dst=sgpr("AddressScaleAlphaVec",2), src0=sgpr("SrdScaleAlphaVec+2"), src1=0, comment=" == 0 ?"))
+              scaleAlphaVecModule.add(VCndMaskB32(
+                dst=vgpr(inputScaleAlphaVecVgpr), \
+                src1=vgpr(inputScaleAlphaVecVgpr), \
+                src0=1.0, \
+                src2=sgpr("AddressScaleAlphaVec",2), \
+                comment="1. mul 1 if 0"))
+
+              if isActivationInsertAfter:
+                if (self.kernel["ProblemType"]["DestDataType"].isHalf()):
+                  scaleAlphaVecModule.add(VCvtF16toF32(dst=vgpr("ValuC+%d"%vgprIdx), src=vgpr("ValuC+%d"%vgprIdx)))
+                if self.kernel["ProblemType"]["DestDataType"].isBFloat16():
+                  scaleAlphaVecModule.add(VCvtBF16toFP32(dst=("ValuC+%d"%vgprIdx), src=("ValuC+%d"%vgprIdx), vgprMask=None, vi=0))
+                if self.kernel["ProblemType"]["DestDataType"].isInt32() or self.kernel["ProblemType"]["DestDataType"].isInt8():
+                  scaleAlphaVecModule.add(VCvtI32toF32(dst=vgpr("ValuC+%d"%vgprIdx), src=vgpr("ValuC+%d"%vgprIdx)))
+                scaleAlphaVecModule.add(VMulF32(dst=vgpr("ValuC+%d"%vgprIdx), src0=vgpr(inputScaleAlphaVecVgpr), src1=vgpr("ValuC+%d"%vgprIdx), comment="*= scaleAlphaVecVMul" ))
+              else:
+                scaleAlphaVecModule.add(VMulF32(dst=vgpr("ValuC+%d"%vgprIdx), src0=vgpr(inputScaleAlphaVecVgpr), src1=vgpr("ValuC+%d"%vgprIdx), comment="*= scaleAlphaVecVMul" ))
+
+            # Original packed route
+            elif vi%2 == 1:
+              assert (self.gwvw % 2 == 0)
+            else:
+              scaleAlphaVecModule.add(VCmpGtU32(dst=sgpr("AddressScaleAlphaVec",2), src0=sgpr("SrdScaleAlphaVec+2"), src1=0, comment=" == 0 ?"))
+              scaleAlphaVecModule.add(VCndMaskB32(
+                dst=vgpr(inputScaleAlphaVecVgpr), \
+                src1=vgpr(inputScaleAlphaVecVgpr), \
+                src0=1.0, \
+                src2=sgpr("AddressScaleAlphaVec",2), \
+                comment="1. mul 1 if 0"))
+
+              scaleAlphaVecModule.add(VCndMaskB32(
+                dst=vgpr(inputScaleAlphaVecVgpr+1), \
+                src1=vgpr(inputScaleAlphaVecVgpr+1), \
+                src0=1.0, \
+                src2=sgpr("AddressScaleAlphaVec",2), \
+                comment="1. mul 1 if 0"))
+
+              if 0: #isActivationInsertAfter:
+                if self.kernel["ProblemType"]["DestDataType"].isHalf():
+                  scaleAlphaVecModule.add(VCvtF16toF32(dst=vgpr("ValuC+%d"%vgprIdx), src=vgpr("ValuC+%d"%vgprIdx)))
+                  scaleAlphaVecModule.add(VCvtF16toF32(dst=vgpr("ValuC+%d"%(vgprIdx+1)), src=vgpr("ValuC+%d"%(vgprIdx+1))))
+                if self.kernel["ProblemType"]["DestDataType"].isBFloat16():
+                  scaleAlphaVecModule.add(VCvtBF16toFP32(dst=("ValuC+%d"%vgprIdx), src=("ValuC+%d"%vgprIdx), vgprMask=None, vi=0))
+                  scaleAlphaVecModule.add(VCvtBF16toFP32(dst=("ValuC+%d"%(vgprIdx+1)), src=("ValuC+%d"%(vgprIdx+1)), vgprMask=None, vi=0))
+                if self.kernel["ProblemType"]["DestDataType"].isInt32() or self.kernel["ProblemType"]["DestDataType"].isInt8():
+                  scaleAlphaVecModule.add(VCvtI32toF32(dst=vgpr("ValuC+%d"%vgprIdx), src=vgpr("ValuC+%d"%vgprIdx)))
+                  scaleAlphaVecModule.add(VCvtI32toF32(dst=vgpr("ValuC+%d"%(vgprIdx+1)), src=vgpr("ValuC+%d"%(vgprIdx+1))))
+                scaleAlphaVecModule.add(VMulPKF32(dst=vgpr("ValuC+%d"%vgprIdx, 2), src0=vgpr(inputScaleAlphaVecVgpr, 2), src1=vgpr("ValuC+%d"%vgprIdx, 2), comment="*= scaleAlphaVecVMulPK(%d)(%d)"%(dataScaleAlphaVec,vi)))
+              else:
+                scaleAlphaVecModule.add(VMulPKF32(dst=vgpr("ValuC+%d"%vgprIdx, 2), src0=vgpr(inputScaleAlphaVecVgpr, 2), src1=vgpr("ValuC+%d"%vgprIdx, 2), comment="*= scaleAlphaVecVMulPK(%d)(%d)"%(dataScaleAlphaVec,vi)))
+          else:
+            raise RuntimeError("Unsupported scaleAlphaVec compute data type %s."%str(self.kernel["ProblemType"]["ComputeDataType"]))
+
+      module.add(scaleAlphaVecModule)
 
       if self.beta:
         module.add(self._addSumAlphaWithCBeta(self.kernel, self.ss, self.gwvw, elementIdx, vc0, self.tmpVgpr, self.bf16CVTVgprStruct))
@@ -671,7 +777,7 @@ class GlobalWriteBatchWriter:
       gradientInput = dataE if self.kernel["ProblemType"]["Gradient"] and (self.kernel["GlobalSplitU"] == 1) else self.ss.elementSumIdx[elementIdx]
       if self.kernel["ActivationFuncCall"]:
         if (activationCDataType == self.kernel["ProblemType"]["DestDataType"]) and \
-          (activationCDataType != self.kernel["ProblemType"]["ComputeDataType"]) and (self.kernel["ProblemType"]["UseScaleDVec"] == False):
+          (activationCDataType != self.kernel["ProblemType"]["ComputeDataType"]) and (self.kernel["ProblemType"]["UseScaleDVec"] == False) and (self.kernel["ProblemType"]["UseScaleAlphaVec"] == False):
           isActivationInsertAfter = True
         activationModule = Module("ActivationFuncCall")
         if (not mergeActFuncCall) and (not isActivationInsertAfter):
@@ -681,7 +787,7 @@ class GlobalWriteBatchWriter:
           src=sgpr(self.activationSetPCStruct.sgprOffsetActivation, 2)))
         activationModule.appendModule (copyData(activationCDataType, gradientInput, self.gwvw, \
           self.activationSetPCStruct.vgprActCopy, 1))
-      elif self.parentWriter.insertActivationAfterPacked(self.kernel, self.activationTypeStr) and (self.kernel["ProblemType"]["UseScaleDVec"] == False):
+      elif self.parentWriter.insertActivationAfterPacked(self.kernel, self.activationTypeStr) and (self.kernel["ProblemType"]["UseScaleDVec"] == False) and (self.kernel["ProblemType"]["UseScaleAlphaVec"] == False):
         isActivationInsertAfter = True
         activationModule = self.parentWriter.getActivationDestDataType(self.kernel, self.activation, \
           self.activationTypeStr, self.gwvw, gradientInput , gradientInput, self.tmpVgpr, self.tmpSgpr)
@@ -814,6 +920,7 @@ class GlobalWriteBatchWriter:
       else:
         module.add(activationModule)
         module.add(scaleDVecModule)
+        # module.add(scaleAlphaVecModule)
         module.add(biasReductionModule)
         module.add(convertModule)
         module.add(packModule)

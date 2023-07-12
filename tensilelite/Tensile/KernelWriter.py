@@ -3652,6 +3652,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
       self.defineSgpr("SrdScaleDVec", 4, 4)# asm input interface
+    if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+      self.defineSgpr("SrdScaleAlphaVec", 4, 4)# asm input interface
     ###################################
     # Get kernel argument start here
     self.defineSgpr("AddressD", numSgprAddressD,4)
@@ -3678,6 +3680,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
       numSgprAddressScaleDVec = numSgprAddressA
       self.defineSgpr("AddressScaleDVec", numSgprAddressScaleDVec)
+    numSgprAddressScaleAlphaVec = 0
+    if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+      numSgprAddressScaleAlphaVec = numSgprAddressA
+      self.defineSgpr("AddressScaleAlphaVec", numSgprAddressScaleAlphaVec)
     self.defineSgpr("StridesD", self.states.d.numSgprStrides)
     self.defineSgpr("StridesC", self.states.c.numSgprStrides)
     self.defineSgpr("StridesA", self.states.a.numSgprStrides)
@@ -3711,7 +3717,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("SmallMagicNumberDivWg0", 1)
       self.defineSgpr("SmallMagicNumberDivWg01", 1)
 
-    self.states.numSgprToLoad = numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAddressScaleDVec + numSgprAlpha + numSgprAddressMetadata + \
+    self.states.numSgprToLoad = numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAddressScaleDVec + numSgprAddressScaleAlphaVec + numSgprAlpha + numSgprAddressMetadata + \
       (numSgprBeta if kernel["ProblemType"]["UseBeta"] else 0) + self.states.d.numSgprStrides + self.states.c.numSgprStrides + self.states.a.numSgprStrides + \
       self.states.b.numSgprStrides + self.states.m.numSgprStrides + self.states.numSgprSizesFree + self.states.numSgprSizesSum + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \
