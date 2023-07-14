@@ -131,6 +131,7 @@ namespace hipblaslt_ext
         // Epilogue inputs
         void* bias      = nullptr; //!< The bias input pointer.
         void* scaleDVec = nullptr; //!< The scaleD vector input pointer.
+        void* scaleAlphaVec = nullptr; //!< The scaleD vector input pointer.
         void* aux       = nullptr; //!< The aux input pointer.
     };
 

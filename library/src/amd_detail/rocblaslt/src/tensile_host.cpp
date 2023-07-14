@@ -1551,7 +1551,7 @@ inline auto getSolutions(
 
     std::vector<std::shared_ptr<Tensile::ContractionSolution>> solutions_fallback;
     // Fallback to original kernels
-    if(scaleDVec == nullptr && bias == nullptr && E == nullptr
+    if(scaleDVec == nullptr && scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
     // if(scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
        && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
     {
@@ -1559,13 +1559,13 @@ inline auto getSolutions(
         auto actType      = tensile_prob.activationType();
         auto actHPA       = tensile_prob.activationHPA();
         auto useScaleDVec = tensile_prob.useScaleDVec();
-        // auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
+        auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
         auto useE         = tensile_prob.useE();
         tensile_prob.setUseBias(false);
         tensile_prob.setActivationType(Tensile::ActivationType::None);
         tensile_prob.setActivationHPA(false);
         tensile_prob.setUseScaleDVec(false);
-        // tensile_prob.setUseScaleAlphaVec(false);
+        tensile_prob.setUseScaleAlphaVec(false);
         tensile_prob.setUseE(false);
         std::cout << "Victor8" << std::endl;
         solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
@@ -1574,7 +1574,7 @@ inline auto getSolutions(
         tensile_prob.setActivationType(actType);
         tensile_prob.setActivationHPA(actHPA);
         tensile_prob.setUseScaleDVec(useScaleDVec);
-        // tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
+        tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
         tensile_prob.setUseE(useE);
         std::cout << "Victor9" << std::endl;
     }
