@@ -683,7 +683,7 @@ class GlobalWriteBatchWriter:
                 src2=sgpr("AddressScaleAlphaVec",2), \
                 comment="1. mul 1 if 0"))
 
-              if isActivationInsertAfter:
+              if 0: #isActivationInsertAfter:
                 if (self.kernel["ProblemType"]["DestDataType"].isHalf()):
                   scaleAlphaVecModule.add(VCvtF16toF32(dst=vgpr("ValuC+%d"%vgprIdx), src=vgpr("ValuC+%d"%vgprIdx)))
                 if self.kernel["ProblemType"]["DestDataType"].isBFloat16():

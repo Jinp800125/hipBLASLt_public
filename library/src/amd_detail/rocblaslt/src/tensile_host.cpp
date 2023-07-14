@@ -452,6 +452,8 @@ namespace
         // tensileProblem.setUseScaleAlphaVec(true);
         // tensileProblem.setScaleAlphaVec(Tensile_Tc, d.sizes()[0]);
 
+        std::cout << "Victor1" << std::endl;
+
         // set Actvation
         if(is_act_enabled(prob.epilogue))
         {
@@ -597,6 +599,7 @@ namespace
             tensileProblem.setActivationHPA(false);
             tensileProblem.setUseScaleDVec(false);
             // tensileProblem.setUseScaleAlphaVec(false);
+            std::cout << "Victor2" << std::endl;
             tensileProblem.setUseE(false);
             tensileProblem.setUseGradient(false);
         }
@@ -615,9 +618,11 @@ namespace
             tensileProblem.setUseScaleDVec(true);
             tensileProblem.setScaleDVec(Tensile_Tc, d.sizes()[0]);
 
-            // // set ScaleDVec mode
-            // tensileProblem.setUseScaleDVec(true);
-            // tensileProblem.setScaleDVec(Tensile_Tc, d.sizes()[0]);
+            // set ScaleDVec mode
+            tensileProblem.setUseScaleAlphaVec(true);
+            tensileProblem.setScaleAlphaVec(Tensile_Tc, d.sizes()[0]);
+
+            std::cout << "Victor3" << std::endl;
 
             // set Actvation
             if(is_act_enabled(prob.epilogue))
@@ -1342,6 +1347,7 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
             data->problem.setUseScaleAlphaVec(solution->problemType.useScaleAlphaVec);
             data->problem.setUseE(solution->problemType.useE);
             data->problem.setUseGradient(solution->problemType.useGradient);
+            std::cout << "Victor4" << std::endl;
             data->kernels = solution->solve(data->problem, data->inputs, *hardware);
             data->problem.setUseBias(useBias);
             data->problem.setActivationType(actType);
@@ -1350,6 +1356,7 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
             data->problem.setUseScaleAlphaVec(useScaleAlphaVec);
             data->problem.setUseE(useE);
             data->problem.setUseGradient(useGrad);
+            std::cout << "Victor5" << std::endl;
         }
         else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GROUPED_GEMM)
         {
@@ -1380,6 +1387,7 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                 data->problem.gemms[i].setActivationHPA(solution->problemType.activationHPA);
                 data->problem.gemms[i].setUseScaleDVec(solution->problemType.useScaleDVec);
                 data->problem.gemms[i].setUseScaleAlphaVec(solution->problemType.useScaleAlphaVec);
+                std::cout << "Victor6" << std::endl;
             }
 
             size_t requiedHostSize
@@ -1406,6 +1414,7 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                 data->problem.gemms[i].setActivationHPA(actHPA[i]);
                 data->problem.gemms[i].setUseScaleDVec(useScaleDVec[i]);
                 data->problem.gemms[i].setUseScaleAlphaVec(useScaleAlphaVec[i]);
+                std::cout << "Victor7" << std::endl;
             }
         }
         status = rocblaslt_status_success;
@@ -1558,6 +1567,7 @@ inline auto getSolutions(
         tensile_prob.setUseScaleDVec(false);
         // tensile_prob.setUseScaleAlphaVec(false);
         tensile_prob.setUseE(false);
+        std::cout << "Victor8" << std::endl;
         solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
         // restore
         tensile_prob.setUseBias(useBias);
@@ -1566,8 +1576,10 @@ inline auto getSolutions(
         tensile_prob.setUseScaleDVec(useScaleDVec);
         // tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
         tensile_prob.setUseE(useE);
+        std::cout << "Victor9" << std::endl;
     }
     auto solutions = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+    std::cout << "solutions.size(): " << solutions.size() << std::endl;
     if(solutions_fallback.size() > 0)
     {
         solutions.insert(solutions.begin(), solutions_fallback.begin(), solutions_fallback.end());
@@ -1585,6 +1597,7 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem<Ti, To, Tc> prob,
                                   int*                                    returnAlgoCount,
                                   size_t                                  maxWorkSpaceBytes)
 {
+    std::cout << "Victor getBestSolutions1" << std::endl;
     std::shared_ptr<Tensile::MasterSolutionLibrary<Tensile::ContractionProblemGemm>> library;
     std::shared_ptr<hipDeviceProp_t>                                                 deviceProp;
     std::shared_ptr<Tensile::Hardware>                                               hardware;
@@ -1595,9 +1608,11 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem<Ti, To, Tc> prob,
     hardware = Tensile::hip::GetDevice(*deviceProp);
 
     std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
+    std::cout << "Victor getBestSolutions1 updateTensileProblem" << std::endl;
     updateTensileProblem(false, prob, data->problem);
 
     int  fallbackSize = 0;
+    std::cout << "Victor getBestSolutions1 getSolutions" << std::endl;
     auto solutions
         = getSolutions(prob, library, hardware, data->problem, requestedAlgoCount, fallbackSize);
 
@@ -1808,6 +1823,7 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
                 tensile_prob.setActivationHPA(false);
                 tensile_prob.setUseScaleDVec(false);
                 // tensile_prob.setUseScaleAlphaVec(false);
+                std::cout << "Victor10" << std::endl;
                 tensile_prob.setUseE(false);
                 bool isSup = (*solution->hardwarePredicate)(*hardware)
                              && (*solution->problemPredicate)(tensile_prob);
@@ -1819,6 +1835,7 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
                 tensile_prob.setUseScaleDVec(useScaleDVec);
                 // tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
                 tensile_prob.setUseE(useE);
+                std::cout << "Victor11" << std::endl;
                 if(!isSup)
                 {
                     log_error(__func__, "Solution is not supported");
@@ -1893,6 +1910,7 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
                 tensile_prob.gemms[i].setActivationHPA(false);
                 tensile_prob.gemms[i].setUseScaleDVec(false);
                 // tensile_prob.gemms[i].setUseScaleAlphaVec(false);
+                std::cout << "Victor12" << std::endl;
                 if(!((*solution->hardwarePredicate)(*hardware)
                      && (*solution->problemPredicate)(tensile_prob.gemms[i])))
                 {
@@ -1907,6 +1925,7 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
                 tensile_prob.gemms[i].setActivationHPA(actHPA);
                 tensile_prob.gemms[i].setUseScaleDVec(useScaleDVec);
                 // tensile_prob.gemms[i].setUseScaleAlphaVec(useScaleAlphaVec);
+                std::cout << "Victor13" << std::endl;
                 if(!isFallbackSupported)
                     break;
             }
@@ -1993,6 +2012,7 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
                                   const int              requestedAlgoCount,
                                   std::vector<rocblaslt_matmul_heuristic_result>& heuristicResults)
 {
+    std::cout << "Victor getBestSolutions2" << std::endl;
     std::shared_ptr<Tensile::MasterSolutionLibrary<Tensile::ContractionProblemGemm>> library;
     std::shared_ptr<hipDeviceProp_t>                                                 deviceProp;
     std::shared_ptr<Tensile::Hardware>                                               hardware;
@@ -2069,6 +2089,7 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
                 data->problem.gemms[i].setActivationHPA(false);
                 data->problem.gemms[i].setUseScaleDVec(false);
                 // data->problem.gemms[i].setUseScaleAlphaVec(false);
+                std::cout << "Victor14" << std::endl;
             }
             solutions_fallback = library->findTopSolutionsGroupedGemm(
                 data->problem.gemms, *hardware, requestedAlgoCount);
@@ -2079,6 +2100,7 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
                 data->problem.gemms[i].setActivationHPA(actHPA[i]);
                 data->problem.gemms[i].setUseScaleDVec(useScaleDVec[i]);
                 // data->problem.gemms[i].setUseScaleAlphaVec(useScaleAlphaVec[i]);
+                std::cout << "Victor15" << std::endl;
             }
         }
 

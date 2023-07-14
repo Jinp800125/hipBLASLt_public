@@ -234,6 +234,7 @@ void mat_mul_bias_activation(Tc             alpha,
                              int            Es3,
                              To*            bias,
                              Tc*            scaleDVec,
+                             Tc*            scaleAlphaVec,
                              bool           gradient,
                              ActivationType actType,
                              Tc*            workspace)
@@ -258,6 +259,7 @@ void mat_mul_bias_activation(Tc             alpha,
                     t += static_cast<Tc>(A[i1 * As1 + i3 * As2 + batch * As3])
                          * static_cast<Tc>(B[i3 * Bs1 + i2 * Bs2 + batch * Bs3]);
                 }
+                t = t * (scaleAlphaVec == nullptr ? 1.0 : scaleAlphaVec[i1]);
                 t = beta * static_cast<Tc>(C[i1 * Cs1 + i2 * Cs2 + batch * Cs3]) + alpha * t
                     + (bias == nullptr ? 0 : bias[i1]);
                 if(E != nullptr && !gradient)
@@ -347,6 +349,8 @@ static void show_usage(char* argv[])
               << "\t--bias \t\t\tbias \t\tGEMM_STRIDED enable bias and choose bias src: A, B, D\n"
               << "\t--scaleDVec \t\tscaleDVec \t\tGEMM_STRIDED enable scaleDVec: 0 or 1 "
                  "(default is 0)\n"
+              << "\t--scaleAlphaVec \t\tscaleAlphaVec \t\tGEMM_STRIDED enable scaleAlphaVec: 0 or 1 "
+                 "(default is 0)\n"
               << "\t--header \t\theader \t\tPrint header for output (default is "
                  "enabled)\n"
               << "\t--timing \t\ttiming \t\tBechmark GPU kernel performance:0 or "
@@ -385,6 +389,7 @@ static int parse_arguments(int                 argc,
                            bool&               enable_e,
                            BiasSrc&            biasSrc,
                            bool&               enable_scaleDVec,
+                           bool&               enable_scaleAlphaVec,
                            ActivationType&     actType,
                            bool&               header,
                            bool&               verbose,
@@ -532,6 +537,10 @@ static int parse_arguments(int                 argc,
                 else if((arg == "--scaleDVec") && (i + 1 < argc))
                 {
                     enable_scaleDVec = atoi(argv[++i]);
+                }
+                else if((arg == "--scaleAlphaVec") && (i + 1 < argc))
+                {
+                    enable_scaleAlphaVec = atoi(argv[++i]);
                 }
                 else if((arg == "--act") && (i + 1 < argc))
                 {
@@ -731,7 +740,7 @@ bool bad_argument(hipblasOperation_t trans_a,
 }
 
 bool epilogue_bad_argument(
-    bool enable_grad, bool enable_e, BiasSrc biasSrc, bool enable_scaleDVec, ActivationType actType)
+    bool enable_grad, bool enable_e, BiasSrc biasSrc, bool enable_scaleDVec, bool enable_scaleAlphaVec, ActivationType actType)
 {
     bool argument_error = false;
     if(biasSrc == BiasSrc::A || biasSrc == BiasSrc::B)
@@ -773,7 +782,9 @@ void initialize_a_b_c_e_bias(std::vector<T>&     ha,
                              std::vector<T>&     h_bias,
                              int64_t             size_bias,
                              std::vector<float>& h_scaleDVec,
-                             int64_t             size_scaleDVec)
+                             int64_t             size_scaleDVec,
+                             std::vector<float>& h_scaleAlphaVec,
+                             int64_t             size_scaleAlphaVec)
 {
     srand(1);
     for(int i = 0; i < size_a; ++i)
@@ -799,6 +810,10 @@ void initialize_a_b_c_e_bias(std::vector<T>&     ha,
     for(int i = 0; i < size_scaleDVec; ++i)
     {
         h_scaleDVec[i] = static_cast<float>((rand() % 7) - 3);
+    }
+    for(int i = 0; i < size_scaleAlphaVec; ++i)
+    {
+        h_scaleAlphaVec[i] = static_cast<float>(2);
     }
 }
 
@@ -826,6 +841,7 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
                     bool               enable_e,
                     BiasSrc            biasSrc,
                     bool               enable_scaleDVec,
+                    bool               enable_scaleAlphaVec,
                     ActivationType     actType,
                     bool               validate,
                     bool               verbose,
@@ -886,6 +902,7 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
     int size_d         = batch_count == 0 ? size_d1 : size_d1 + stride_d * (batch_count - 1);
     int size_e         = batch_count == 0 ? size_e1 : size_e1 + stride_e * (batch_count - 1);
     int size_scaleDVec = enable_scaleDVec ? m : 0;
+    int size_scaleAlphaVec = enable_scaleAlphaVec ? m : 0;
     int size_bias      = 0;
     switch(biasSrc)
     {
@@ -911,6 +928,7 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
     std::vector<T>     h_bias(size_bias);
     std::vector<T>     h_bias_gold(size_bias);
     std::vector<float> h_scaleDVec(size_scaleDVec);
+    std::vector<float> h_scaleAlphaVec(size_scaleAlphaVec);
 
     // initial data on host
     initialize_a_b_c_e_bias(ha,
@@ -924,10 +942,12 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
                             h_bias,
                             size_bias,
                             h_scaleDVec,
-                            size_scaleDVec);
+                            size_scaleDVec,
+                            h_scaleAlphaVec,
+                            size_scaleAlphaVec);
 
     // allocate memory on device
-    void *      da, *db, *dc, *dd, *de = nullptr, *d_bias = nullptr, *d_scaleDVec = nullptr;
+    void *      da, *db, *dc, *dd, *de = nullptr, *d_bias = nullptr, *d_scaleDVec = nullptr, *d_scaleAlphaVec = nullptr;
     int         num_streams = 1;
     hipStream_t stream      = nullptr;
 
@@ -941,6 +961,8 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
         CHECK_HIP_ERROR(hipMalloc(&d_bias, size_bias * sizeof(T)));
     if(enable_scaleDVec)
         CHECK_HIP_ERROR(hipMalloc(&d_scaleDVec, size_scaleDVec * sizeof(float)));
+    if(enable_scaleAlphaVec)
+        CHECK_HIP_ERROR(hipMalloc(&d_scaleAlphaVec, size_scaleAlphaVec * sizeof(float)));
     // copy matrices from host to device
     CHECK_HIP_ERROR(hipMemcpy(da, ha.data(), sizeof(T) * size_a, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(db, hb.data(), sizeof(T) * size_b, hipMemcpyHostToDevice));
@@ -954,6 +976,11 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
         CHECK_HIP_ERROR(hipMemcpy(d_scaleDVec,
                                   h_scaleDVec.data(),
                                   sizeof(float) * size_scaleDVec,
+                                  hipMemcpyHostToDevice));
+    if(enable_scaleAlphaVec)
+        CHECK_HIP_ERROR(hipMemcpy(d_scaleAlphaVec,
+                                  h_scaleAlphaVec.data(),
+                                  sizeof(float) * size_scaleAlphaVec,
                                   hipMemcpyHostToDevice));
 
     hipblasLtHandle_t           handle;
@@ -1044,6 +1071,9 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
     if(enable_scaleDVec)
         CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
             matmul, HIPBLASLT_MATMUL_DESC_D_SCALE_VECTOR_POINTER, &d_scaleDVec, sizeof(void*)));
+    if(enable_scaleAlphaVec)
+        CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
+            matmul, HIPBLASLT_MATMUL_DESC_ALPHA_SCALE_VECTOR_POINTER, &d_scaleAlphaVec, sizeof(void*)));
 
     // Set User Preference attributes
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceCreate(&pref));
@@ -1404,7 +1434,7 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
     std::cout << trans_string << m << ", " << n << ", " << k << ", " << lda << ", " << ldb << ", "
               << ldc << ", " << stride_a << ", " << stride_b << ", " << stride_c << ", "
               << batch_count << ", " << alpha << ", " << beta << ", " << enable_e << ", "
-              << ToString(biasSrc) << ", " << enable_scaleDVec << ", " << ToString(actType);
+              << ToString(biasSrc) << ", " << enable_scaleDVec << ", " << enable_scaleAlphaVec << ", " << ToString(actType);
     if(timing)
     {
         std::cout << ", " << bestMs * 1000 << ", " << bestTflops;
@@ -1438,6 +1468,11 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
             scaleDVec_ptr = &h_scaleDVec[0];
         else
             scaleDVec_ptr = nullptr;
+        float* scaleAlphaVec_ptr;
+        if(enable_scaleAlphaVec)
+            scaleAlphaVec_ptr = &h_scaleAlphaVec[0];
+        else
+            scaleAlphaVec_ptr = nullptr;
         void* workspace = nullptr;
         if(enable_grad && biasSrc == BiasSrc::D)
             workspace = (void*)malloc(workspace_size);
@@ -1469,6 +1504,7 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
                                              stride_e,
                                              bias_ptr,
                                              scaleDVec_ptr,
+                                             scaleAlphaVec_ptr,
                                              enable_grad,
                                              actType,
                                              (float*)workspace);
@@ -1590,6 +1626,8 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
         }
         if(enable_scaleDVec)
             print_strided_batched("h_scaleDVec", &h_scaleDVec[0], m, 1, 1, 1, m, 0);
+        if(enable_scaleAlphaVec)
+            print_strided_batched("h_scaleAlphaVec", &h_scaleAlphaVec[0], m, 1, 1, 1, m, 0);
         print_strided_batched("hd_gold", &hd_gold[0], m, n, batch_count, 1, ldc, stride_c);
         print_strided_batched("hd device", &hd[0], m, n, batch_count, 1, ldc, stride_c);
     }
@@ -1613,6 +1651,8 @@ void test_hipblaslt(hipblasDatatype_t  in_out_datatype,
         CHECK_HIP_ERROR(hipFree(d_bias));
     if(enable_scaleDVec)
         CHECK_HIP_ERROR(hipFree(d_scaleDVec));
+    if(enable_scaleAlphaVec)
+        CHECK_HIP_ERROR(hipFree(d_scaleAlphaVec));
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceDestroy(pref));
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescDestroy(matmul));
     CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matA));
@@ -1658,6 +1698,7 @@ int main(int argc, char* argv[])
     bool           enable_e         = false;
     BiasSrc        biasSrc          = BiasSrc::NONE;
     bool           enable_scaleDVec = false;
+    bool           enable_scaleAlphaVec = false;
     ActivationType actType          = ActivationType::NONE;
 
     bool verbose  = false;
@@ -1692,6 +1733,7 @@ int main(int argc, char* argv[])
                        enable_e,
                        biasSrc,
                        enable_scaleDVec,
+                       enable_scaleAlphaVec,
                        actType,
                        header,
                        verbose,
@@ -1763,7 +1805,7 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    if(epilogue_bad_argument(enable_grad, enable_e, biasSrc, enable_scaleDVec, actType))
+    if(epilogue_bad_argument(enable_grad, enable_e, biasSrc, enable_scaleDVec, enable_scaleAlphaVec, actType))
     {
         show_usage(argv);
         return EXIT_FAILURE;
@@ -1772,7 +1814,7 @@ int main(int argc, char* argv[])
     if(header)
     {
         std::cout << "transAB, M, N, K, lda, ldb, ldc, stride_a, stride_b, "
-                     "stride_c, batch_count, alpha, beta, use_e, bias, scaleDVec, activationType";
+                     "stride_c, batch_count, alpha, beta, use_e, bias, scaleDVec, scaleAlphaVec, activationType";
         if(timing)
             std::cout << ", us, tflops";
         if(request_solutions > 1)
@@ -1804,6 +1846,7 @@ int main(int argc, char* argv[])
                                        enable_e,
                                        biasSrc,
                                        enable_scaleDVec,
+                                       enable_scaleAlphaVec,
                                        actType,
                                        validate,
                                        verbose,
@@ -1838,6 +1881,7 @@ int main(int argc, char* argv[])
                                       enable_e,
                                       biasSrc,
                                       enable_scaleDVec,
+                                      enable_scaleAlphaVec,
                                       actType,
                                       validate,
                                       verbose,
@@ -1872,6 +1916,7 @@ int main(int argc, char* argv[])
                                           enable_e,
                                           biasSrc,
                                           enable_scaleDVec,
+                                          enable_scaleAlphaVec,
                                           actType,
                                           validate,
                                           verbose,
