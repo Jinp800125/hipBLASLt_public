@@ -279,7 +279,9 @@ namespace Tensile
         if(sizeMapping.globalAccumulation)
         {
             args.template append<void const*>("ws_d", (uint8_t*)inputs.ws + workspaceOffsetInByte);
-            args.template append<void const*>("ws_c", (uint8_t*)inputs.ws + workspaceOffsetInByte);
+            // args.append<void const*>("ws_c", (uint8_t*)inputs.ws + workspaceOffsetInByte);
+            // args.append<void const*>("ws_c", inputs.d);
+            args.template append<void const*>("ws_c", inputs.c);
         }
         else if(problemType.stridedBatched)
         {
@@ -317,12 +319,14 @@ namespace Tensile
                 args.append("beta_2", inputs.beta, problem.betaType());
         }
 
-        if(problemType.useScaleDVec && (sizeMapping.globalSplitU == 1)) //kernel input data
+        // if(problemType.useScaleDVec && (sizeMapping.globalSplitU == 1)) //kernel input data
+        if(problemType.useScaleDVec) //kernel input data
         {
             args.template append<void const*>("scaleDVec", inputs.scaleDVec);
         }
 
-        if(problemType.useScaleAlphaVec && (sizeMapping.globalSplitU == 1)) //kernel input data
+        // if(problemType.useScaleAlphaVec && (sizeMapping.globalSplitU == 1)) //kernel input data
+        if(problemType.useScaleAlphaVec) //kernel input data
         {
             args.template append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
         }
@@ -395,6 +399,14 @@ namespace Tensile
         uint32_t wgmRemainder1            = 0;
         uint32_t magicNumberWgmRemainder1 = 0;
 
+        // if(!problemType.useScaleDVec && !problemType.useBias && (sizeMapping.globalAccumulation == 2))
+        if((sizeMapping.globalAccumulation == 2))
+        {
+            args.template append<uint32_t>("GSUSync", 0);
+            args.template append<void const*>("ws_tc", inputs.d);
+        }
+        // args.append<uint32_t>("GSUSync", wgmRemainder1);
+
         if(isGrouped)
         {
             uint32_t smallMagicNumberDivWg0 = 0, smallMagicNumberDivWg01 = 0;
@@ -409,10 +421,13 @@ namespace Tensile
         }
 
         bool runActivation = false;
+        // if((problemType.activationType != ActivationType::None) && sizeMapping.activationFused
+        //    && (sizeMapping.globalSplitU == 1))
         if((problemType.activationType != ActivationType::None) && sizeMapping.activationFused
-           && (sizeMapping.globalSplitU == 1))
+           )
             runActivation = true;
-        if(problemType.useBias && (sizeMapping.globalSplitU == 1))
+        // if(problemType.useBias && (sizeMapping.globalSplitU == 1))
+        if(problemType.useBias)
         {
             // We save the bias data in ws_d
             if(problemType.useGradient && problem.biasSrc() == ContractionProblemGemm::TENSOR::D
@@ -428,7 +443,8 @@ namespace Tensile
             args.template append<void*>("e", inputs.e);
         }
 
-        if(problemType.useBias && (sizeMapping.globalSplitU == 1)
+        // if(problemType.useBias && (sizeMapping.globalSplitU == 1)
+        if(problemType.useBias
            && (!problemType.useGradient
                || (problemType.useGradient
                    && (problem.biasSrc() == ContractionProblemGemm::TENSOR::A
@@ -719,15 +735,18 @@ namespace Tensile
         else
             rv.args.append<void const* const*>("batchC", inputs.batchC);
 
-        if(problemType.useBias && sizeMapping.globalAccumulation == 0 && (!problemType.useGradient))
+        // if(problemType.useBias && sizeMapping.globalAccumulation == 0 && (!problemType.useGradient))
+        if(problemType.useBias && (!problemType.useGradient))
         {
             rv.args.append<void const*>("bias", inputs.bias);
         }
-        if(problemType.useScaleDVec && sizeMapping.globalAccumulation == 0)
+        // if(problemType.useScaleDVec && sizeMapping.globalAccumulation == 0)
+        if(problemType.useScaleDVec)
         {
             rv.args.append<void const*>("scaleDVec", inputs.scaleDVec);
         }
-        if(problemType.useScaleAlphaVec && sizeMapping.globalAccumulation == 0)
+        // if(problemType.useScaleAlphaVec && sizeMapping.globalAccumulation == 0)
+        if(problemType.useScaleAlphaVec)
         {
             rv.args.append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
         }
@@ -804,7 +823,8 @@ namespace Tensile
             name += "_GB";
         }
 
-        if(problemType.useBias && (sizeMapping.globalAccumulation == 0)
+        // if(problemType.useBias && (sizeMapping.globalAccumulation == 0)
+        if(problemType.useBias
            && (!problemType.useGradient))
         {
             auto s = TypeAbbrev(problem.biasType());
@@ -1527,12 +1547,19 @@ namespace Tensile
         else
             rv.push_back(generateSingleCall<false>(problem, inputs));
 
-        if(sizeMapping.globalAccumulation)
+        //std::cout << "Running customKernelName: " << sizeMapping.customKernelName << std::endl;
+        //std::cout << "Running globalAccumulation: " << sizeMapping.globalAccumulation << std::endl;
+
+        // if(sizeMapping.globalAccumulation)
+        // if(sizeMapping.globalSplitU > 1 && sizeMapping.globalAccumulation != 1) // only mutibuffer
+        if (0)
+        // if((sizeMapping.customKernelName == "") && sizeMapping.globalAccumulation)
         {
             if(debug)
                 rv.push_back(generateOutputConversionCall<true>(problem, inputs));
             else
                 rv.push_back(generateOutputConversionCall<false>(problem, inputs));
+            std::cout << "Running generateOutputConversionCall: "  << std::endl;
         }
 
         if(((sizeMapping.globalSplitU > 1 && (!sizeMapping.globalAccumulation))
@@ -1543,6 +1570,7 @@ namespace Tensile
                 rv.push_back(generateActivationOnlyCall<true>(problem, inputs));
             else
                 rv.push_back(generateActivationOnlyCall<false>(problem, inputs));
+            std::cout << "Running generateActivationOnlyCall: "  << std::endl;
         }
 
         // The reduction of A is done in ConversionKernel when GSU > 1 in MultipleBuffer mode
@@ -1669,7 +1697,10 @@ namespace Tensile
         else
             rv.push_back(generateSingleCallGroupedGemm<false>(problems, inputs, h_args));
 
-        if(sizeMapping.globalAccumulation)
+        // if(sizeMapping.globalAccumulation)
+        // if(sizeMapping.globalSplitU > 1 && sizeMapping.globalAccumulation != 1) // only mutibuffer
+        // if (0)
+        if((sizeMapping.customKernelName == "") && sizeMapping.globalAccumulation)
         {
             if(debug)
                 rv.push_back(

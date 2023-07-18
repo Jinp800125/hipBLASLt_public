@@ -194,11 +194,13 @@ class StoreState:
                 self.sharedColEVgprs = kernelWriter.vgprPool.checkOut(self.numAddrVgpr, "sharedColEVgprs for packed elements")
             else:
                 self.sharedColEVgprs = None
-            if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseScaleDVec"]:
                 self.sharedColScaleDVecVgprs = kernelWriter.vgprPool.checkOut(self.numAddrVgpr, "sharedColScaleDVecVgprs for packed elements")
             else:
                 self.sharedColScaleDVecVgprs = None
-            if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseScaleAlphaVec"]:
                 self.sharedColScaleAlphaVecVgprs = kernelWriter.vgprPool.checkOut(self.numAddrVgpr, "sharedColScaleAlphaVecVgprs for packed elements")
             else:
                 self.sharedColScaleAlphaVecVgprs = None
@@ -221,11 +223,13 @@ class StoreState:
                 self.sharedColEVgprs = kernelWriter.vgprPool.checkOut(1, "sharedColEVgprs for packed elements")
             else:
                 self.sharedColEVgprs = None
-            if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseScaleDVec"]:
                 self.sharedColScaleDVecVgprs = kernelWriter.vgprPool.checkOut(1, "sharedColScaleDVecVgprs for packed elements")
             else:
                 self.sharedColScaleDVecVgprs = None
-            if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseScaleAlphaVec"]:
                 self.sharedColScaleAlphaVecVgprs = kernelWriter.vgprPool.checkOut(1, "sharedColScaleAlphaVecVgprs for packed elements")
             else:
                 self.sharedColScaleAlphaVecVgprs = None
@@ -258,11 +262,13 @@ class StoreState:
                 numVgprs = int(ceil(kernel["ProblemType"]["ComputeDataType"].numRegisters()))
                 self.numVgprsPerElement += numVgprs * gwvw  # Loaded data
 
-        if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+        # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleDVec"]:
             self.numVgprsPerElement += self.cfg.numVgprsPerAddr  # ScaleDVec address
             numVgprs = int(ceil(kernel["ProblemType"]["DataType"].numRegisters()))
             self.numVgprsPerElement += numVgprs * gwvw  # Loaded data
-        if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+        # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleAlphaVec"]:
             self.numVgprsPerElement += self.cfg.numVgprsPerAddr  # ScaleAlphaVec address
             numVgprs = int(ceil(kernel["ProblemType"]["DataType"].numRegisters()))
             self.numVgprsPerElement += numVgprs * gwvw  # Loaded data
@@ -399,11 +405,13 @@ class StoreState:
                     addrEVgpr = None
                 #print ("d0=", d0, "vc0=", vc0, "elementCol=", elementCol)
 
-                if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                if kernel["ProblemType"]["UseScaleDVec"]:
                     addrScaleDVecVgpr = self.sharedColScaleDVecVgprs+elementCol
                 else:
                     addrScaleDVecVgpr = None
-                if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                if kernel["ProblemType"]["UseScaleAlphaVec"]:
                     addrScaleAlphaVecVgpr = self.sharedColScaleAlphaVecVgprs+elementCol
                 else:
                     addrScaleAlphaVecVgpr = None
@@ -427,12 +435,14 @@ class StoreState:
                 else:
                     addrEVgpr = None
 
-                if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                if kernel["ProblemType"]["UseScaleDVec"]:
                     addrScaleDVecVgpr = kw.vgprPool.checkOutAligned(self.cfg.numVgprsPerAddr, \
                         int(ceil(self.cfg.numVgprsPerAddr)), "loadScaleDVecBatch-addr for ei=%u"%(elementIdx), preventOverflow=not isOptNLL)
                 else:
                     addrScaleDVecVgpr = None
-                if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                if kernel["ProblemType"]["UseScaleAlphaVec"]:
                     addrScaleAlphaVecVgpr = kw.vgprPool.checkOutAligned(self.cfg.numVgprsPerAddr, \
                         int(ceil(self.cfg.numVgprsPerAddr)), "loadScaleAlphaVecBatch-addr for ei=%u"%(elementIdx), preventOverflow=not isOptNLL)
                 else:
@@ -494,7 +504,8 @@ class StoreState:
                 dataE = 0
             self.elementDataE.append(dataE)
 
-            if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseScaleDVec"]:
                 if coordOffset0 in scaleDVecVgprMap:
                     dataScaleDVec = scaleDVecVgprMap[coordOffset0]
                 else:
@@ -506,7 +517,8 @@ class StoreState:
                 dataScaleDVec = 0
             self.elementDataScaleDVec.append(dataScaleDVec)
 
-            if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            if kernel["ProblemType"]["UseScaleAlphaVec"]:
                 if coordOffset0 in scaleAlphaVecVgprMap:
                     dataScaleAlphaVec = scaleAlphaVecVgprMap[coordOffset0]
                 else:

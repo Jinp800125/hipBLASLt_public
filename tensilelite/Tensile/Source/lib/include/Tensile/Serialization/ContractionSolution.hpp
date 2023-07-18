@@ -98,6 +98,10 @@ namespace Tensile
                 iot::mapRequired(io, "workspaceSizePerElemBias", s.workspaceSizePerElemBias);
 
                 iot::mapOptional(io, "activationFused", s.activationFused);
+
+                iot::mapOptional(io, "CustomKernelName", s.customKernelName);
+                // std::cout << "mapping customKernelName: " << s.customKernelName << std::endl;
+                // std::cout << "mapping globalAccumulation: " << s.globalAccumulation << std::endl;
             }
 
             const static bool flow = false;

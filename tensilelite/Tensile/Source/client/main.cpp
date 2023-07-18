@@ -607,6 +607,7 @@ int main(int argc, const char* argv[])
                                 else
                                     HIP_CHECK_EXC(
                                         adapter.launchKernels(kernels, stream, nullptr, nullptr));
+                                    // adapter.launchKernels(kernels, stream, nullptr, nullptr);
                                 listeners.postWarmup();
                                 // Do validation after first warmup
                                 if(i == 0)
@@ -630,6 +631,7 @@ int main(int argc, const char* argv[])
                                 {
                                     HIP_CHECK_EXC(
                                         adapter.launchKernels(kernels, stream, nullptr, nullptr));
+                                    // adapter.launchKernels(kernels, stream, nullptr, nullptr)
                                 }
 
                                 listeners.postEnqueues(startEvents, stopEvents, stream);

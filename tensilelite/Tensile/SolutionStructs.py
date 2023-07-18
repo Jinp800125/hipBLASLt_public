@@ -1116,6 +1116,7 @@ class Solution(collections.abc.Mapping):
     self.activationFunctionObjects = []
     if ((self["ProblemType"]["ActivationType"] != 'none') and (self["ProblemType"]["ActivationType"] == 'all') and \
         ((self["GlobalSplitU"] > 1) or (self["ActivationFused"] == False))) :
+        # ((self["ActivationFused"] == False))) :
       state = {}
       state["ProblemType"] = deepcopy(self["ProblemType"])
       state["KernelLanguage"] = "Source"
@@ -1126,6 +1127,8 @@ class Solution(collections.abc.Mapping):
     self.activationOnlyKernelObjects = []
     if (((self["GlobalSplitU"] > 1) and (not self["_GlobalAccumulation"])) or (self["ActivationFused"] == False)) \
       and (self["ProblemType"]["ActivationType"] != 'none') :
+    # if (((not self["_GlobalAccumulation"])) or (self["ActivationFused"] == False)) \
+      # and (self["ProblemType"]["ActivationType"] != 'none') :
       state = {}
       state["ProblemType"] = deepcopy(self["ProblemType"])
       state["ProblemType"]["UseBias"] = False
@@ -3418,7 +3421,9 @@ class Solution(collections.abc.Mapping):
 
     # Activation
     # Function call is set to false if GSU != 1 or Activation is not fused or ActivationType is not All.
-    if not ((state["GlobalSplitU"] == 1) and state["ActivationFused"] and state["ProblemType"]["ActivationType"] == 'all') \
+    # if not ((state["GlobalSplitU"] == 1) and state["ActivationFused"] and state["ProblemType"]["ActivationType"] == 'all') \
+    #   and state["ActivationFuncCall"]:
+    if not (state["ActivationFused"] and state["ProblemType"]["ActivationType"] == 'all') \
       and state["ActivationFuncCall"]:
       state["ActivationFuncCall"] = False
 

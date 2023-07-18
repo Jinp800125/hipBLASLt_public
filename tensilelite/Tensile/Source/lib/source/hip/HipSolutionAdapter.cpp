@@ -130,6 +130,8 @@ namespace Tensile
 
         void SolutionAdapter::loadEmbeddedCodeObjects(std::string const& key)
         {
+            if(m_debug)
+                std::cout << "loadEmbeddedCodeObjects " << std::endl;
             auto const& embeddedData = EmbeddedData<Tensile::SolutionAdapter>::Get(key);
 
             if(embeddedData.size() == 0)
@@ -187,14 +189,16 @@ namespace Tensile
         {
             std::unique_lock<std::mutex> guard(m_access);
             hipError_t                   err = hipErrorNotFound;
-
+            if(m_debug)
+                std::cout << "getKernel start" << std::endl;
             auto it = m_kernels.find(name);
             if(it != m_kernels.end())
             {
                 rv = it->second;
                 return hipSuccess;
             }
-
+            if(m_debug)
+                std::cout << "getKernel mid" << std::endl;
             for(auto module : m_modules)
             {
                 err = hipModuleGetFunction(&rv, module, name.c_str());
@@ -209,7 +213,8 @@ namespace Tensile
                     return err;
                 }
             }
-
+            if(m_debug)
+                std::cout << "getKernel done: " << err << std::endl;
             return err;
         }
 
@@ -264,6 +269,8 @@ namespace Tensile
                                                  hipEvent_t              startEvent,
                                                  hipEvent_t              stopEvent)
         {
+            if(m_debug)
+                std::cout << "launchKernel: start" << std::endl;
             if(!kernel.codeObjectFile.empty())
             {
                 //If required code object file hasn't yet been loaded, load it now
@@ -309,7 +316,11 @@ namespace Tensile
             }
 
             hipFunction_t function;
+            if(m_debug)
+                std::cout << "launchKernel: getKernel start: " << kernel.kernelName << std::endl;
             HIP_CHECK_RETURN(getKernel(function, kernel.kernelName));
+            if(m_debug)
+                std::cout << "launchKernel: getKernel done" << std::endl;
 
             void*  kernelArgs = const_cast<void*>(kernel.args.data());
             size_t argsSize   = kernel.args.size();
@@ -336,6 +347,8 @@ namespace Tensile
                                                       nullptr, // event
                                                       nullptr // event
                                                       ));
+            if(m_debug)
+                std::cout << "launchKernel: hipExtModuleLaunchKernel done" << std::endl;
             if(stopEvent != nullptr)
                 HIP_CHECK_RETURN(hipEventRecord(stopEvent, stream));
             return hipSuccess;
@@ -367,7 +380,8 @@ namespace Tensile
                     kStart = startEvent;
                 if(iter == last)
                     kStop = stopEvent;
-
+                if(m_debug)
+                    std::cout << "launchKernels iter: " << iter->kernelName << std::endl;
                 HIP_CHECK_RETURN(launchKernel(*iter, stream, kStart, kStop));
             }
             return hipSuccess;
@@ -389,6 +403,8 @@ namespace Tensile
 
             for(size_t i = 0; i < kernels.size(); i++)
             {
+                if(m_debug)
+                    std::cout << "launchKernels kernels: " << kernels[i].kernelName << std::endl;
                 HIP_CHECK_RETURN(launchKernel(kernels[i], stream, startEvents[i], stopEvents[i]));
             }
             return hipSuccess;

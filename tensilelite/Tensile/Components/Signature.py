@@ -87,9 +87,11 @@ class SignatureCOV3(Signature):
         signature.addArg(   "alpha",        SVK.SIG_VALUE, cptValueType)
         if kernel["ProblemType"]["UseBeta"]:
             signature.addArg("beta",        SVK.SIG_VALUE, cptValueType)
-        if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+        # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleDVec"]:
             signature.addArg("AddressScaleDVec", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
-        if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+        # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleAlphaVec"]:
             signature.addArg("AddressScaleAlphaVec", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
         for i in range(0, writer.states.d.numSgprStrides):
             signature.addArg(              "strideD%u"%i, SVK.SIG_VALUE,               "u32")
@@ -122,10 +124,15 @@ class SignatureCOV3(Signature):
         signature.addArg(               "NumWorkGroups0", SVK.SIG_VALUE,              "u32")
         signature.addArg(               "NumWorkGroups1", SVK.SIG_VALUE,              "u32")
 
+        if (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBuffer'):
+            signature.addArg(               "GSUSync", SVK.SIG_VALUE,              "u32")
+            signature.addArg(    "CT", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+
         if writer.states.useBias == DataDirection.READ:
             signature.addArg("bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")
         # We append the data in ws_d
-        elif writer.states.useBias == DataDirection.WRITE and (kernel["GlobalSplitU"] == 1):
+        # elif writer.states.useBias == DataDirection.WRITE and (kernel["GlobalSplitU"] == 1):
+        elif writer.states.useBias == DataDirection.WRITE:
             signature.addArg("ws_bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")
 
         if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
@@ -139,7 +146,8 @@ class SignatureCOV3(Signature):
                 signature.addArg("StrideE%u"%i,        SVK.SIG_VALUE,        "u32")
 
 
-        if ((kernel["ProblemType"]["ActivationType"] != 'none') and (kernel["GlobalSplitU"] == 1) \
+        # if ((kernel["ProblemType"]["ActivationType"] != 'none') and (kernel["GlobalSplitU"] == 1) \
+        if ((kernel["ProblemType"]["ActivationType"] != 'none') \
             and kernel["ActivationFused"]):
             if kernel["ProblemType"]["ActivationComputeDataType"].isHalf():
                 actValueType = 'pkf16'

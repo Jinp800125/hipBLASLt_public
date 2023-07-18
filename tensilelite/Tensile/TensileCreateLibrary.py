@@ -55,6 +55,7 @@ from copy import deepcopy
 
 ################################################################################
 def processKernelSource(kernel, kernelWriterAssembly, ti):
+    print("Victor processKernelSource")
     """
     Generate source for a single kernel.
     Returns (error, source, header, kernelName).
@@ -447,6 +448,7 @@ def buildKernelSourceAndHeaderFiles(results, outputPath, kernelsWithBuildErrs):
 ################################################################################
 def writeSolutionsAndKernels(outputPath, CxxCompiler, problemTypes, solutions, kernels, kernelHelperObjs, \
     kernelWriterAssembly, errorTolerant=False):
+  print("Victor writeSolutionsAndKernels")
   start = time.time()
 
   codeObjectFiles = []

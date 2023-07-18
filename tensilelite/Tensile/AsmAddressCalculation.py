@@ -266,13 +266,15 @@ class AddrCalculation:
                                                 src=vgpr(self.addrBiasVgpr), \
                                                 comment="Bias address scaled by BPE"))
                         return module
-                    if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                    # if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                    if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"]:
                         module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleDVecVgpr), \
                                                  shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                                  src=vgpr(self.coord0Vgpr), \
                                                 comment="ScaleDVec address scaled by BPE"))
                         return module
-                    if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                    # if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                    if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"]:
                         module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                                  shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                                  src=vgpr(self.coord0Vgpr), \
@@ -302,13 +304,15 @@ class AddrCalculation:
                                             src=vgpr(self.addrBiasVgpr), \
                                             comment="Bias address scaled by BPE"))
                     return module
-                if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                # if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+                if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"]:
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleDVecVgpr), \
                                              shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                              src=vgpr(self.coord0Vgpr), \
                                             comment="ScaleDVec address scaled by BPE"))
                     return module
-                if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                # if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"]:
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                              shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                              src=vgpr(self.coord0Vgpr), \
@@ -338,13 +342,15 @@ class AddrCalculation:
                                         src=vgpr(self.addrBiasVgpr), \
                                         comment="Bias address scaled by BPE"))
                 return module
-            if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            # if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"]:
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleDVecVgpr), \
                                          shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                          src=vgpr(self.coord0Vgpr), \
                                         comment="ScaleDVec address scaled by BPE"))
                 return module
-            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            # if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"]:
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                          shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                          src=vgpr(self.coord0Vgpr), \
@@ -559,24 +565,43 @@ class AddrCalculation:
         module = Module("emitLdChange")
         if kernel["BufferStore"]:
             module.add(self.emitScaleToBpe(kernel, ss, tmpVgpr, tmpSgpr, singleUpdate, tc))
+            
+            if 1 and (edge or singleUpdate) and (tc == 'C'):
+            # if 1 and (tc == 'C'):
+                  module.addComment("GSUSYNCc1 %u"%(singleUpdate)) #GSUSYNC
+                  print("GSUSYNCc ", "addrVgpr: ", addrVgpr, " ", tmpVgpr)
+                  module.addGSUSYNC("\n") #GSUSYNC
+                  module.add(MacroInstruction("GSUSYNCc", \
+                         args=[vgpr(addrVgpr)]))
+                  module.addGSUSYNC("\n") #GSUSYNC
+
             if edge and (not kernel["StoreRemapVectorWidth"] or (kernel["StoreRemapVectorWidth"] and beta)) and \
                 ((tc != 'Bias') and (tc != 'ScaleDVec') and (tc != 'ScaleAlphaVec')):
+                if 0 and (tc == 'C'):
+                    module.addComment("GSUSYNCc2") #GSUSYNC
+                    module.addGSUSYNC("\n") #GSUSYNC
+                    module.add(MacroInstruction("GSUSYNCc", \
+                         args=[vgpr(addrVgpr)]))
+                    module.addGSUSYNC("\n") #GSUSYNC
                 module.add(VCndMaskB32(dst=vgpr(addrVgpr), src0=-1, src1=vgpr(addrVgpr), \
                                src2=sgpr(mask,laneSGPRCount), comment="LD%s clip if OOB. offset" % tc ))
         else:
-            if tc == 'Bias' and kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
+            # if tc == 'Bias' and kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'Bias':
                 module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr("WorkGroup0"), comment="wgp0 * MT0"))
                 module.add(VSubU32(dst=vgpr(self.addrBiasVgpr), src0=vgpr(self.coord0Vgpr), src1=sgpr(tmpSgpr)))
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrBiasVgpr), \
                                         shiftHex=hex(log2(self.kernelWriter.states.bpeCinternal)), \
                                         src=vgpr(self.addrBiasVgpr), \
                                         comment="Bias address scaled by BPE"))
-            if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            # if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'ScaleDVec' and kernel["ProblemType"]["UseScaleDVec"]:
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleDVecVgpr), \
                                         shiftHex=hex(log2(self.kernelWriter.states.bpeCinternal)), \
                                         src=vgpr(self.coord0Vgpr), \
                                         comment="ScaleDVec address scaled by BPE"))
-            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            # if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"]:
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                         shiftHex=hex(log2(self.kernelWriter.states.bpeCinternal)), \
                                         src=vgpr(self.coord0Vgpr), \

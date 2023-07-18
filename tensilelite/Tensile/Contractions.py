@@ -465,7 +465,7 @@ class SizeMapping:
                  'globalAccumulation',
                  'workspaceSizePerElemC',
                  'workspaceSizePerElemBias',
-                 'activationFused'
+                 'activationFused', 'CustomKernelName'
                  ]
 
     @classmethod
@@ -489,7 +489,8 @@ class SizeMapping:
                    globalAccumulation       = globalAccum,
                    workspaceSizePerElemC    = d['_WorkspaceSizePerElemC'],
                    workspaceSizePerElemBias = d['_WorkspaceSizePerElemBias'],
-                   activationFused          = d['ActivationFused']
+                   activationFused          = d['ActivationFused'],
+                   CustomKernelName         = d['CustomKernelName']
                    )
 
     @classmethod

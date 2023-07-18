@@ -41,19 +41,19 @@ class GlobalWriteBatchComponent(GlobalWriteComponents):
     batchIdx, applyAlpha, beta, edge, atomic, gwvw, atomicW, \
     batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, addrScaleAlphaVec, biasLocalBarrierInit: bool, \
     tmpVgpr, bf16CVTVgprStruct, activationSetPCStruct, activationTypeStr, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeMulAlpha, \
-    packdata, parentWriter) -> Module:
+    packdata, label2, parentWriter) -> Module:
     return GlobalWriteBatchWriter(kernel, tPA, tPB, activation, ss, batchIdx, applyAlpha, \
       beta, edge, atomic, gwvw, atomicW, \
       batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, addrScaleAlphaVec, biasLocalBarrierInit, \
       tmpVgpr, bf16CVTVgprStruct, activationSetPCStruct, activationTypeStr, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeMulAlpha, \
-      packdata, parentWriter).emit()
+      packdata, label2, parentWriter).emit()
 
 class GlobalWriteBatchWriter:
   def __init__(self, kernel: Solution, tPA, tPB, activation: ActivationModule, ss: StoreState, \
     batchIdx, applyAlpha, beta, edge, atomic, gwvw, atomicW, \
     batchElements, addrE, addrD, addrC, addrBias, addrScaleDVec, addrScaleAlphaVec, biasLocalBarrierInit: bool, \
     tmpVgpr, bf16CVTVgprStruct, activationSetPCStruct, activationTypeStr, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeMulAlpha, \
-      packdata, parentWriter):
+      packdata, label2, parentWriter):
     self.kernel = kernel
     self.tPA    = tPA
     self.tPB    = tPB
@@ -86,6 +86,7 @@ class GlobalWriteBatchWriter:
     self.parentWriter = parentWriter
     self.loadsIssued = 0
     self.storesIssued = 0
+    self.label2 = label2
 
     # Internal state for GlobalWriteBatch
     # 0 for None, 1 for WorkGroupReduction = False, 2 for WorkGroupReduction = True
@@ -218,6 +219,7 @@ class GlobalWriteBatchWriter:
     # on the thread and tid number.  These are ELEMENT offsets from start of tensor C
     # for the top-left corner this thread will write.  These are not changed
     # across all the store loop iters.
+
     if self.debugConfig["ConservativeWaitCnt"] & 0x10:
       module.add(SBarrier("debug"))
       module.add(SWaitCnt(vmcnt=0, comment="ConservativeWaitCnt"))
@@ -250,6 +252,10 @@ class GlobalWriteBatchWriter:
     loadedDataBias = {}
     loadedDataScaleDVec = {}
     loadedDataScaleAlphaVec = {}
+    # labelname = "label_BUSYWAIT%s%s_" \
+    #     % ("_Beta" if self.beta else "", "_Edge" if self.edge else "")
+    # labelname += self.activationTypeStr
+    # labelname = self.parentWriter.labels.getNameInc(labelname)
     for elementIdx, element in enumerate(self.batchElements):
       addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
       addrCVgpr    = addrCalc.addrCVgpr
@@ -265,18 +271,42 @@ class GlobalWriteBatchWriter:
       dataScaleAlphaVec = self.ss.elementDataScaleAlphaVec[elementIdx]
       mask     = self.ss.elementMask[elementIdx]
       vc0 = element[3]
+      sumIdxGSUSYNC = self.ss.elementSumIdx[elementIdx]
 
+      # if elementIdx==0:
+      #   labelname = self.parentWriter.labels.getNameInc(labelname)
+      #   module.add(MacroInstruction("GSUSYNC0", args=[labelname, "label_KernelEnd"]))
+
+      # labelname1 = "label_BUSYWAIT%s%s_" \
+      #   % ("_Beta" if self.beta else "", "_Edge" if self.edge else "")
+
+      # labelname1 += self.activationTypeStr
+      # labelname1 = self.parentWriter.labels.getNameInc(labelname1)
       module.add(addrCalc.emitAddressSetupCode(self.kernel, self.tPB, self.ss, self.tmpVgpr, self.tmpS01, self.edge, self.beta, self.atomic, elementIdx, addrDVgpr))
-
+      # module.addComment("GSUSYNC1") #GSUSYNC
+      # module.addGSUSYNC("\n") #GSUSYNC
+      # module.add(MacroInstruction("GSUSYNC1", \
+      #        args=[labelname1, "label_KernelEnd"]))
+      # module.addGSUSYNC("\n") #GSUSYNC
       if self.edge:
         module.add(addrCalc.edgeProtectCode(self.kernel, self.edge, self.beta, self.atomic, mask, self.tmpSgpr))
 
       # create code Module to push mov vgpr,acc instructions
       if self.beta:
         module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'C', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrCVgpr, self.addrC))
+        # if (tc == 'C'):
+        if 1 :
+          module.addComment("GSUSYNCc3 %u"%(elementIdx)) #GSUSYNC
+          # print("GSUSYNCc ", "addrVgpr: ", addrCVgpr, " ", self.tmpVgpr)
+          # module.addGSUSYNC("\n") #GSUSYNC
+          # module.add(MacroInstruction("GSUSYNCc", \
+          #        args=[vgpr(addrCVgpr)]))
+          # module.addGSUSYNC("\n") #GSUSYNC
         if self.kernel["GroupLoadStore"]:
           loadInputCode.add(self.parentWriter.readInput(self.kernel, self.ss, 'C', self.kernel["ProblemType"]["DestDataType"], addrCalc, vc0, data, self.gwvw, addrCVgpr, self.tmpS01))
         else:
+          print("DestDataType", self.kernel["ProblemType"]["DestDataType"])
+          print("self.gwvw", self.gwvw)
           module.add(self.parentWriter.readInput(self.kernel, self.ss, 'C', self.kernel["ProblemType"]["DestDataType"], addrCalc, vc0, data, self.gwvw, addrCVgpr, self.tmpS01))
         self.loadsIssued += 1
       if (self.kernel["ProblemType"]["UseE"] and self.kernel["ProblemType"]["Gradient"] and self.kernel["ProblemType"]["ActivationType"] != 'none') and (self.kernel["GlobalSplitU"] == 1):
@@ -294,13 +324,15 @@ class GlobalWriteBatchWriter:
         if dataBias not in loadedDataBias:
           if self.kernel["GroupLoadStore"]:
             # Group bias load with C input to
-            if (self.kernel["GlobalSplitU"] == 1) and (not self.biasLocalBarrierInit):
+            # if (self.kernel["GlobalSplitU"] == 1) and (not self.biasLocalBarrierInit):
+            if (not self.biasLocalBarrierInit):
               loadInputCode.add(SWaitCnt(lgkmcnt=0, comment="Wait for Bias LDS write"))
               loadInputCode.add(SBarrier("Bias LDS write barrier"))
               self.biasLocalBarrierInit = True
             loadInputCode.add(self.parentWriter.addBiasLoad(self.kernel["ProblemType"]["ComputeDataType"], self.kernel, self.ss, addrCalc, dataBias, True))
           else:
-            if (self.kernel["GlobalSplitU"] == 1) and (not self.biasLocalBarrierInit):
+            # if (self.kernel["GlobalSplitU"] == 1) and (not self.biasLocalBarrierInit):
+            if (not self.biasLocalBarrierInit):
               module.add(SWaitCnt(lgkmcnt=0, comment="Wait for Bias LDS write"))
               module.add(SBarrier("Bias LDS write barrier"))
               self.biasLocalBarrierInit = True
@@ -309,7 +341,8 @@ class GlobalWriteBatchWriter:
           self.localLoadIssued += 1
       self.biasLoadIssued.append(len(loadedDataBias))
 
-      if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+      # if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+      if self.kernel["ProblemType"]["UseScaleDVec"]:
         module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'ScaleDVec', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrScaleDVecVgpr, self.addrScaleDVec))
         if dataScaleDVec not in loadedDataScaleDVec:
           # Shift right several vgprs for cvt ops if needed
@@ -324,7 +357,8 @@ class GlobalWriteBatchWriter:
           loadedDataScaleDVec[dataScaleDVec] = 1
           self.loadsScaleDVecIssued += 1
       self.scaleDVecLoadIssued.append(len(loadedDataScaleDVec))
-      if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+      # if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+      if self.kernel["ProblemType"]["UseScaleAlphaVec"]:
         module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'ScaleAlphaVec', self.edge, self.beta, mask, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrScaleDVecVgpr, self.addrScaleDVec))
         if dataScaleAlphaVec not in loadedDataScaleAlphaVec:
           # Shift right several vgprs for cvt ops if needed
@@ -407,6 +441,199 @@ class GlobalWriteBatchWriter:
       if not self.kernel["MIArchVgpr"]:
         module.add(SNop(1, "2 wait states required before reading vgpr"))
 
+    ########################################################
+    # interleaveStoreVmcnt = self.parentWriter.states.interleaveStoreVmcnt and not self.edge
+
+    # for elementIdx in range(len(self.batchElements)):
+    #   for vi in range(self.gwvw):
+    #     sumIdxV = self.ss.elementSumIdx[elementIdx] + vi
+    #     newSumIdxV = sumIdxV - self.parentWriter.states.c.startVgprValu
+    #     # covers sgemm, gemm_ex(HHS/HSS/BBS/BSS (HPA=T)), int8 (int8x4?)
+    #     if self.kernel["ProblemType"]["ComputeDataType"].isInt32() or \
+    #         self.kernel["ProblemType"]["ComputeDataType"].isSingle(): # covers sgemm/gemm_ex(HHS/HSS/BBS/BSS)
+    #         if self.debugConfig["ForceExpectedValue"]:
+    #           module.add(VMovB32(vgpr("ValuC+%u"%newSumIdxV), self.debugConfig["ValueCExpectedValue"], "force expected value" ))
+    #         if self.parentWriter.db["ForceVSerial"]:
+    #           module.add(VMovB32(vgpr("ValuC+%u"%newSumIdxV), vgpr("Serial"), "force expected value to serial" ))
+    #         if self.parentWriter.db["CheckValueC"]:
+    #           module.add(SMovB32(sgpr(self.tmpS01), self.debugConfig["ValueCExpectedValue"], "Move expected value"))
+    #           module.add(self.parentWriter.getCmpAssert(self.parentWriter.asmAssert.eq, vgpr("ValuC+%u"%newSumIdxV), sgpr(self.tmpS01)))
+
+    # ########################################
+    # # wait for batched load
+    # # Here we wait all
+    # if not interleaveStoreVmcnt:
+    #   vmcnt = -1
+    #   lgkmcnt = -1
+    #   commentList = []
+    #   # Global read wait
+    #   if self.beta:
+    #     vmcnt = 0
+    #     commentList.append("Beta")
+    #   if self.loadE:
+    #     vmcnt = 0
+    #     commentList.append("E")
+    #   # if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+    #   if self.kernel["ProblemType"]["UseScaleDVec"]:
+    #     vmcnt = 0
+    #     commentList.append("ScaleDVec")
+    #   # Local read wait
+    #   if self.parentWriter.states.useBias == DataDirection.READ:
+    #     lgkmcnt = 0
+    #     commentList.append("Bias LDS")
+    #   if (vmcnt != -1) or (lgkmcnt != -1):
+    #     # Get comment
+    #     comment = "wait for " + commentList[0]
+    #     for c in commentList[1:]:
+    #       comment += ", %s"%c
+    #     module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=-1, comment=comment))
+
+    storeCodeGSUGSU = Module("GroupLoadStore")
+    waitCnterGSUGSU = [self.loadsIssued + self.loadsScaleDVecIssued, self.localLoadIssued]
+    for elementIdx in range(0, len(self.batchElements)):
+      element = self.batchElements[elementIdx]
+      addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
+      addr = addrCalc.addrDVgpr
+      dataE = self.ss.elementDataE[elementIdx]
+      dataBias = self.ss.elementDataBias[elementIdx]
+      dataScaleDVec = self.ss.elementDataScaleDVec[elementIdx]
+      mask = self.ss.elementMask[elementIdx]
+      vc0 = element[3]
+      sumIdx = self.ss.elementSumIdx[elementIdx]
+
+      # print(str(element)+" rowInc="+str(addrCalc.rowInc))
+      # Already write wave column block into LDS
+      # Now read lds data back to registers and write to global memroy
+      if self.ss.optSrdIncForRow and addrCalc.rowInc and self.kernel["StoreRemapVectorWidth"] > 0:
+        module.addComment1("StoreRemap: shift coord1 address")
+        if self.kernel["ProblemType"]["UseE"] and (self.kernel["GlobalSplitU"] == 1):
+          printExit("Use E does not support StoreRemapVectorWidth if GSU == 1.")
+          # module.add(addrCalc.incrementToNextRow(self.kernel, "E", self.ss, self.tmpS01, isCompute=True))
+        module.add(addrCalc.incrementToNextRow(self.kernel, "D", self.ss, self.tmpS01))
+        module.add(VMovB32(vgpr(self.tmpVgpr), addrCalc.rowInc, "set shift rows"))
+        module.add(VAddU32(vgpr(self.parentWriter.vgprs.storeRemapCoord1), vgpr(self.parentWriter.vgprs.storeRemapCoord1), vgpr(self.tmpVgpr), "shift storeRemap coord1"))
+
+      # apply in-bounds exec mask
+      if self.edge and not self.kernel["BufferStore"]:
+        module.add(self.getEdgeMovInstType()(EXEC(), sgpr(mask, self.laneSGPRC), "sgprs -> exec"))
+
+      # # if GWVW=1 the half path still assumes we have
+      # # at least two stores so does some combining across VI -
+      # # for example assuming we can have two elements and can use pk_mul
+      # # here:
+      # if interleaveStoreVmcnt:
+      #   waitLocalLoadCnt = 0
+      #   waitLocalLoadCntStrList = []
+      #   waitLoadCnt = 0
+      #   waitLoadCntStrList = []
+      #   # Calculate global loads
+      #   if self.beta:
+      #     betaCnt = elementIdx + 1
+      #     waitLoadCnt += betaCnt
+      #     waitLoadCntStrList.append("%d (beta)"%betaCnt)
+      #   if self.loadE:
+      #     loadECnt = elementIdx + 1
+      #     waitLoadCnt += loadECnt
+      #     waitLoadCntStrList.append("%d (load E)"%loadECnt)
+      #   # if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+      #   if self.kernel["ProblemType"]["UseScaleDVec"]:
+      #     waitLoadCnt += self.scaleDVecLoadIssued[elementIdx]
+      #     waitLoadCntStrList.append("%d (scaleDVec)"%self.scaleDVecLoadIssued[elementIdx])
+      #   # Calculate local loads
+      #   if self.parentWriter.states.useBias == DataDirection.READ:
+      #     waitLocalLoadCnt += self.biasLoadIssued[elementIdx]
+      #     waitLocalLoadCntStrList.append("%d (bias)"%self.biasLoadIssued[elementIdx])
+      #   # Get vmcnt and lgkmcnt
+      #   if waitCnterGSUGSU[0] > 0: # Check if global load issued > 0
+      #     vmcnt = self.loadsIssued + self.loadsScaleDVecIssued - waitLoadCnt
+      #     if waitCnterGSUGSU[0] == vmcnt: # No need to wait if the global load cnt doesn't change
+      #       vmcnt = -1
+      #     waitCnterGSUGSU[0] = vmcnt
+      #   else:
+      #     vmcnt = -1
+      #   if waitCnterGSUGSU[1] > 0: # Check if local load issued > 0
+      #     lgkmcnt = self.localLoadIssued - waitLocalLoadCnt
+      #     if waitCnterGSUGSU[1] == lgkmcnt: # No need to wait if the local load cnt doesn't change
+      #       lgkmcnt = -1
+      #     waitCnterGSUGSU[1] = lgkmcnt
+      #   else:
+      #     lgkmcnt = -1
+      #   # Get vscnt
+      #   if vmcnt != -1:
+      #     if self.parentWriter.states.archCaps["SeparateVscnt"]:
+      #       vscnt = 0
+      #     else:
+      #       vscnt = self.storesIssued if not self.kernel["GroupLoadStore"] else 0
+      #   else:
+      #     vscnt = -1
+      #   if (vmcnt != -1) or (vscnt != -1) or (lgkmcnt != -1):
+      #     # Get comment
+      #     comment = ""
+      #     if vmcnt != -1:
+      #       tmp = ""
+      #       for cntStr in waitLoadCntStrList:
+      #         tmp += " - %s"%cntStr
+      #       comment = "vmcnt(%s) = %d%s"%(vmcnt, self.loadsIssued + self.loadsScaleDVecIssued, tmp)
+      #     if lgkmcnt != -1:
+      #       tmp = ""
+      #       for cntStr in waitLocalLoadCntStrList:
+      #         tmp += " - %s"%cntStr
+      #       comment = comment + (" " if comment else "") + "lgkmcnt(%d) = %d%s"%(lgkmcnt, self.localLoadIssued, tmp)
+      #     module.addSpaceLine()
+      #     if 0:
+      #       module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="%s (interleaved)"%comment))
+
+      if (self.kernel["ProblemType"]["UseE"] and not self.kernel["ProblemType"]["Gradient"]) and (self.kernel["GlobalSplitU"] == 1):
+        vgprIdx = self.ss.elementSumIdx[elementIdx] - self.parentWriter.states.c.startVgprValu
+        vgprDst = self.activationSetPCStruct.vgprActCopy if mergeActFuncCall else "ValuC+%d"%vgprIdx
+        module.add(self.parentWriter.addStore(self.kernel, self.ss, 'E', addrCalc, vgprDst, self.tmpS01, self.edge, comment="store E"))
+
+      SaturateTypeInt8 = SaturateCastType.NORMAL
+
+      if not self.kernel["StoreRemapVectorWidth"]:
+        tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'D', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store D")
+        if self.kernel["GroupLoadStore"]:
+          storeCodeGSUGSU.add(tmpStoreCode)
+        else:
+          module.addGSUSYNC("\n") #GSUSYNC
+          module.add(tmpStoreCode)
+        self.storesIssued += 1
+        if (self.kernel["ProblemType"]["UseE"] and not self.kernel["ProblemType"]["Gradient"]) and (self.kernel["GlobalSplitU"] == 1):
+          self.storesIssued += 1
+        if self.storeBiasD == 1:
+          self.storesIssued += 1
+
+      else:
+        rpe = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr
+        module.add(self.parentWriter.storeRemapAddLocalWrite(self.ss, addrCalc, sumIdx*rpe))
+        # Column Block Shape has been written to LDS
+        # Now read back and write out to global memory
+
+    module.add(storeCodeGSUGSU)
+
+    if self.parentWriter.states.serializedStore and 1:
+      module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
+    ########################################################
+
+    # module.addComment("GSUSYNC label_BUSYWAIT1 label_Activation_End 24 v9") #GSUSYNC
+
+    # labelname = "label_BUSYWAIT%s%s_" \
+    #     % ("_Beta" if self.beta else "", "_Edge" if self.edge else "")
+
+    # labelname += self.activationTypeStr
+    # labelname = self.parentWriter.labels.getNameInc(labelname)
+    module.addGSUSYNC("\n") #GSUSYNC
+    labelname = self.parentWriter.labels.getNameInc(self.label2)
+    # labelname = self.label2
+    if self.kernel["StoreVectorWidth"]==2:
+      module.add(MacroInstruction("GSUSYNC0", args=[labelname, "label_KernelEnd"]))
+      # module.add(MacroInstruction("GSUSYNC1", args=[labelname, "label_KernelEnd"]))
+      module.add(MacroInstruction("GSUSYNC", args=[labelname, "label_KernelEnd", sumIdxGSUSYNC, self.ss.elementSumIdx[elementIdx-1], vgpr(self.ss.elementAddr[elementIdx-1].addrDVgpr)]))
+    else:
+      module.add(MacroInstruction("GSUSYNC0", args=[labelname, "label_KernelEnd"]))
+      # module.add(MacroInstruction("GSUSYNC1", args=[labelname, "label_KernelEnd"]))
+      module.add(MacroInstruction("GSUSYNC", args=[labelname, "label_KernelEnd", sumIdxGSUSYNC, vgpr(addrCalc.addrDVgpr)]))
+    # module.addGSUSYNC("\n") #GSUSYNC
     ########################################
     # rC *= alpha
     if not self.kernel["InterleaveAlpha"] and self.applyAlpha and not self.parentWriter.alphaBeforeLoadC:
@@ -490,7 +717,8 @@ class GlobalWriteBatchWriter:
         self.storesIssued += numNewStores
 
     if self.parentWriter.states.serializedStore:
-      module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
+      if 0:#GSUGSU
+        module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
 
   def _emitAdd(self, module: Module):
     if self.atomic:
@@ -538,10 +766,12 @@ class GlobalWriteBatchWriter:
       if self.loadE:
         vmcnt = 0
         commentList.append("E")
-      if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+      # if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+      if self.kernel["ProblemType"]["UseScaleDVec"]:
         vmcnt = 0
         commentList.append("ScaleDVec")
-      if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+      # if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+      if self.kernel["ProblemType"]["UseScaleAlphaVec"]:
         vmcnt = 0
         commentList.append("ScaleAlphaVec")
       # Local read wait
@@ -554,6 +784,10 @@ class GlobalWriteBatchWriter:
         for c in commentList[1:]:
           comment += ", %s"%c
         module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=-1, comment=comment))
+      else:
+        module.addComment1("(vmcnt == -1) or (lgkmcnt == -1)")
+    else:
+      module.addComment1("interleaveStoreVmcnt")
 
     module.addComment1("apply mask, calc new C and issue writes")
     # module.add(self.getBomb()) # can see store addresses just before the store inst
@@ -613,7 +847,8 @@ class GlobalWriteBatchWriter:
           loadECnt = elementIdx + 1
           waitLoadCnt += loadECnt
           waitLoadCntStrList.append("%d (load E)"%loadECnt)
-        if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+        # if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+        if self.kernel["ProblemType"]["UseScaleDVec"]:
           waitLoadCnt += self.scaleDVecLoadIssued[elementIdx]
           waitLoadCntStrList.append("%d (scaleDVec)"%self.scaleDVecLoadIssued[elementIdx])
         if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
@@ -660,12 +895,14 @@ class GlobalWriteBatchWriter:
               tmp += " - %s"%cntStr
             comment = comment + (" " if comment else "") + "lgkmcnt(%d) = %d%s"%(lgkmcnt, self.localLoadIssued, tmp)
           module.addSpaceLine()
-          module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="%s (interleaved)"%comment))
+          if 0:
+            module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="%s (interleaved)"%comment))
         else:
           module.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="%d(interleaved%dVictor)%d"%(lgkmcnt, vmcnt, vscnt)))
 
       scaleAlphaVecModule = Module("scaleAlphaVecModule")
-      if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+      # if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+      if self.kernel["ProblemType"]["UseScaleAlphaVec"]:
         for vi in range(0, self.gwvw):
           inputScaleAlphaVecVgpr = dataScaleAlphaVec + vi
           sumIdxV   = self.ss.elementSumIdx[elementIdx] + vi
@@ -844,7 +1081,8 @@ class GlobalWriteBatchWriter:
                                      SaturateTypeInt8=SaturateTypeInt8, inputPrefix="ValuC+", prefixOffset=self.parentWriter.states.c.startVgprValu)
 
       scaleDVecModule = Module("scaleDVecModule")
-      if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+      # if self.kernel["ProblemType"]["UseScaleDVec"] and (self.kernel["GlobalSplitU"] == 1):
+      if self.kernel["ProblemType"]["UseScaleDVec"]:
         for vi in range(0, self.gwvw):
           inputScaleDVecVgpr = dataScaleDVec + vi
           sumIdxV   = self.ss.elementSumIdx[elementIdx] + vi
@@ -930,7 +1168,12 @@ class GlobalWriteBatchWriter:
         if self.kernel["GroupLoadStore"]:
           storeCode.add(tmpStoreCode)
         else:
+          if 1:#GSUGSU
+            module.addGSUSYNC("//")
           module.add(tmpStoreCode)
+          if 1:#GSUGSU
+            module.addGSUSYNC("//")
+            module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
         self.storesIssued += 1
         if (self.kernel["ProblemType"]["UseE"] and not self.kernel["ProblemType"]["Gradient"]) and (self.kernel["GlobalSplitU"] == 1):
           self.storesIssued += 1
@@ -944,6 +1187,17 @@ class GlobalWriteBatchWriter:
         # Now read back and write out to global memory
 
     module.add(storeCode)
+
+    # module.addComment("GSUSYNC2 24 v9") #GSUSYNC
+    print("GSUSYNC2 ", "addrVgpr: ", addrCalc.addrDVgpr, " ", self.tmpS01, " ", sumIdx)
+    module.addGSUSYNC("\n") #GSUSYNC
+
+    if self.kernel["StoreVectorWidth"]==2:
+      module.add(MacroInstruction("GSUSYNC2", args=[sumIdx , self.ss.elementSumIdx[elementIdx-1], vgpr(self.ss.elementAddr[elementIdx-1].addrDVgpr)]))
+    else:
+      module.add(MacroInstruction("GSUSYNC2", args=[sumIdx ,vgpr(addrCalc.addrDVgpr)]))
+
+    module.addGSUSYNC("\n") #GSUSYNC
 
     if self.parentWriter.db["CheckStoreC"]>=0:
       useBuffer = self.kernel["BufferStore"]
@@ -1279,7 +1533,8 @@ class GlobalWriteBatchWriter:
   def _applyAlpha(self, kernel, gwvw, elementSumIdx, elementIdx, tmpS01):
     module = Module("applyAlpha")
 
-    if kernel["_GlobalAccumulation"] == 'MultipleBuffer':
+    # if kernel["_GlobalAccumulation"] == 'MultipleBuffer':
+    if 0:
       return module
 
     if self.parentWriter.do["ApplyAlpha"]:

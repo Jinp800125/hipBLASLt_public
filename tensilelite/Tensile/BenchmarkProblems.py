@@ -115,6 +115,7 @@ def generateCustomKernelSolutions(problemType, customKernels, failOnMismatch):
 def writeBenchmarkFiles(stepBaseDir, solutions, problemSizes, \
         biasTypeArgs, activationArgs, stepName, solutionSummationSizes):
     """Write all the files needed for a given benchmarking step"""
+    print("Victor writeBenchmarkFiles")
     if not globalParameters["MergeFiles"]:
         ensurePath(os.path.join(globalParameters["WorkingPath"], "Solutions"))
         ensurePath(os.path.join(globalParameters["WorkingPath"], "Kernels"))
@@ -199,6 +200,7 @@ def writeBenchmarkFiles(stepBaseDir, solutions, problemSizes, \
 
 def benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSizeGroupIdx, useCache):
     """Run the benchmarking for a single entry in the BenchmarkProblems of a Tensile config"""
+    print("Victor benchmarkProblemType")
     benchmarkTestFails = 0
 
     print1("")
