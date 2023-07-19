@@ -3,15 +3,15 @@
 - gfx90a
 - [Device 0050, Device 0051, Device 0052, Device 0054, Device 0062, Device 7400, Device
     740c]
-- Activation: true
-  ActivationComputeDataType: 0
-  ActivationHPA: true
-  ActivationType: all
+- Activation: false
+  ActivationComputeDataType: 4
+  ActivationHPA: false
+  ActivationType: none
   AllowNoFreeDims: false
   AssignedDerivedParameters: true
   Batched: true
   BetaOnlyUseBias: false
-  BiasDataTypeList: [0, 4]
+  BiasDataTypeList: []
   ComplexConjugateA: false
   ComplexConjugateB: false
   ComputeDataType: 0
@@ -55,8 +55,7 @@
   TransposeA: 0
   TransposeB: 0
   UseBeta: true
-  UseBias: true
-  UseScaleDVec: true
+  UseScaleAlphaVec: true
   UseInitialStridesAB: false
   UseInitialStridesCD: false
 - - 1LDSBuffer: 0
@@ -173,15 +172,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -226,15 +225,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 0
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT32x16x64_MI16x16x16x1_SN_GRVW8_GSU6_MIWT1_1_SU0_SUS0_SRVW0_SVW4_VW8_WG32_4_1_WGM1
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT32x16x64_MI16x16x16x1_SN_GRVW8_GSU6_MIWT1_1_SU0_SUS0_SRVW0_SVW4_VW8_WG32_4_1_WGM1
     SourceSwap: 0
     StaggerU: 0
     StaggerUMapping: 0
@@ -389,15 +387,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -442,15 +440,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 1
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT64x16x64_MI16x16x16x1_SN_GRVW2_GSU6_MIWT1_1_SU0_SUS0_SRVW0_SVW4_VW2_WG64_4_1_WGM1
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVW2_GSU6_MIWT1_1_SU0_SUS0_SRVW0_SVW4_VW2_WG64_4_1_WGM1
     SourceSwap: 0
     StaggerU: 0
     StaggerUMapping: 0
@@ -605,15 +602,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -658,15 +655,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 2
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT32x16x64_MI16x16x16x1_SN_GRVW8_GSU25_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW2_VW8_WG32_4_1_WGM8
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT32x16x64_MI16x16x16x1_SN_GRVW8_GSU25_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW2_VW8_WG32_4_1_WGM8
     SourceSwap: false
     StaggerU: 0
     StaggerUMapping: 0
@@ -821,15 +817,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -874,15 +870,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 3
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT16x16x64_MI16x16x16x1_SN_GRVW8_GSU25_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW8_WG16_4_1_WGM1
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT16x16x64_MI16x16x16x1_SN_GRVW8_GSU25_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW8_WG16_4_1_WGM1
     SourceSwap: false
     StaggerU: 0
     StaggerUMapping: 0
@@ -1037,15 +1032,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -1090,15 +1085,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 4
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT16x32x64_MI16x16x16x1_SN_GRVW2_GSU5_LPB4_LRVW4_MIWT1_1_PLR5_SU32_SUS128_SVW4_VW2_WG16_8_1_WGM1
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT16x32x64_MI16x16x16x1_SN_GRVW2_GSU5_LPB4_LRVW4_MIWT1_1_PLR5_SU32_SUS128_SVW4_VW2_WG16_8_1_WGM1
     SourceSwap: false
     StaggerU: 32
     StaggerUMapping: 0
@@ -1253,15 +1247,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -1306,15 +1300,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 5
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT16x32x64_MI16x16x16x1_SN_GRVW2_GSU5_LPB4_LRVW4_MIWT1_1_PLR5_SU0_SUS0_SVW2_VW2_WG16_8_1_WGM1
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT16x32x64_MI16x16x16x1_SN_GRVW2_GSU5_LPB4_LRVW4_MIWT1_1_PLR5_SU0_SUS0_SVW2_VW2_WG16_8_1_WGM1
     SourceSwap: false
     StaggerU: 0
     StaggerUMapping: 0
@@ -1469,15 +1462,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -1522,15 +1515,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 6
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT64x16x64_MI16x16x16x1_SN_GRVW8_GSU9_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW4_WG64_4_1_WGM8
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVW8_GSU9_LPB16_LRVW8_MIWT1_1_PLR5_SU0_SUS0_SVW4_VW4_WG64_4_1_WGM8
     SourceSwap: false
     StaggerU: 0
     StaggerUMapping: 0
@@ -1685,15 +1677,15 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 5
     ProblemType:
-      Activation: true
-      ActivationComputeDataType: 0
-      ActivationHPA: true
-      ActivationType: all
+      Activation: false
+      ActivationComputeDataType: 4
+      ActivationHPA: false
+      ActivationType: none
       AllowNoFreeDims: false
       AssignedDerivedParameters: true
       Batched: true
       BetaOnlyUseBias: false
-      BiasDataTypeList: [0, 4]
+      BiasDataTypeList: []
       ComplexConjugateA: false
       ComplexConjugateB: false
       ComputeDataType: 0
@@ -1738,15 +1730,14 @@
       TransposeA: 0
       TransposeB: 0
       UseBeta: true
-      UseBias: true
       UseInitialStridesAB: false
       UseInitialStridesCD: false
-      UseScaleDVec: true
+      UseScaleAlphaVec: true
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 7
-    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_Bias_AH_SDV_MT64x16x64_MI16x16x16x1_SN_GRVW2_GSU9_MIWT1_1_SU0_SUS0_SRVW0_SVW4_VW4_WG64_4_1_WGM15
+    SolutionNameMin: Cijk_Ailk_Bljk_HHS_BH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVW2_GSU9_MIWT1_1_SU0_SUS0_SRVW0_SVW4_VW4_WG64_4_1_WGM15
     SourceSwap: 0
     StaggerU: 0
     StaggerUMapping: 0
