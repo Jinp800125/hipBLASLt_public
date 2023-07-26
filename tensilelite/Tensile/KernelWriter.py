@@ -1408,6 +1408,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         if isSwapLroIter:
             extraComment += " (swap local read pointers iteration) "
 
+      module.addComment("sdgmhlmg") #GSUSYNC
       module.addComment1("iter %u%s"%(u,extraComment))
       plrIdx = (u+pflr) % self.states.numVgprBuffer
       localReads = Module()
@@ -1713,6 +1714,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if isSwapLroIter:
         extraComment += " (swap local read pointers iteration) "
 
+      module.addComment("pogpok") #GSUSYNC
       module.addComment1("iter %u%s"%(u,extraComment))
       plrIdx = (u+pflr) % self.states.numVgprBuffer
 
@@ -1859,7 +1861,83 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.addComment2("Unrolled Loop - End")
 
     oddLabel = lc == 0
+    # module.addComment("GSUSYNC78") #GSUSYNC
     module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, finalLoop, oddLabel=oddLabel))
+    return module
+
+  def GSUSYNCzero(self, kernel, GSU):
+    module = Module("GSUSYNCzero")
+    # module.addComment1("Magic div and mod functions")
+    # macro = Macro("GSUSYNCzero")
+    # macro.add(VCvtU32toF32(dst="v[\\vQuotient]", src="v[\\vDivisor]"))
+    contents = \
+    "\n\
+//zeroing\n\
+v_mov_b32 v0, 0x0 \n\
+v_mov_b32 v1, 0x0 \n\
+v_mov_b32 v2, 0x0 \n\
+v_mov_b32 v3, 0x0 \n\
+v_mov_b32 v4, 0 \n\
+\n\
+S_OR_B32 s[sgprSrdDd], s[sgprWorkGroup0], s[sgprWorkGroup1]\n\
+s_cmp_eq_u32 s[sgprSrdDd], 0              // specific WG\n\
+s_cbranch_scc0 label_ZEROINGEND           // \n\
+\n\
+s_cmp_eq_u32 s[sgprGSUSumIdx], 0          // \n\
+s_cbranch_scc0 label_ZEROINGEND           // jump if not\n\
+\n\
+s_mul_hi_u32 s[sgprtmp3E], s[sgprStrideCK], "+str(GSU)+"            // cal zeroing start position\n\
+s_mul_i32 s[sgprtmp2E], s[sgprStrideCK], "+str(GSU)+"               //\n\
+s_lshl_b64 s[sgprtmp2E:sgprtmp2E+1], s[sgprtmp2E:sgprtmp2E+1], 2    // scale by bpe\n\
+\n\
+s_mov_b32 s[sgprSrdDd+2], 0x80000000\n\
+s_mov_b32 s[sgprSrdDd+3], Srd127_96\n\
+\n\
+s_add_u32 s[sgprSrdDd+0], s[sgprAddressD+0], s[sgprtmp2E]    // add lo to SRD\n\
+s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp3E]   // add hi to SRD\n"
+    module.addGSUSYNC(contents)
+
+    r, mod = divmod(GSU, 4)
+    print("sdgdfpghk[rk[pkdhkdf[gpldp]]]")
+    print(GSU)
+    print(r)
+    print(mod)
+
+    for i in range(GSU//4):
+        contents = \
+        "\n\
+buffer_store_dwordx4 v[0:3], v4, s[sgprSrdDd:sgprSrdDd+3], 0 offen offset:4*"+str(i)+" // zeroing\n"
+        module.addGSUSYNC(contents)
+    i = GSU//4
+    if mod == 1:
+        contents = \
+        "\n\
+buffer_store_dword v[0], v4, s[sgprSrdDd:sgprSrdDd+3], 0 offen offset:4*"+str(i)+" // \n"
+    if mod == 2:
+        contents = \
+        "\n\
+buffer_store_dwordx2 v[0:1], v4, s[sgprSrdDd:sgprSrdDd+3], 0 offen offset:4*"+str(i)+" // \n"
+    if mod == 3:
+        contents = \
+        "\n\
+buffer_store_dwordx2 v[0:1], v4, s[sgprSrdDd:sgprSrdDd+3], 0 offen offset:4*"+str(i)+" // \n\
+buffer_store_dword v[0], v4, s[sgprSrdDd:sgprSrdDd+3], 0 offen offset:4*"+str(i)+"+2 // \n"
+    module.addGSUSYNC(contents)
+
+    if kernel["ProblemType"]["UseScaleDVec"]:
+      offset = "0x84"
+    else:
+      offset = "0x60"
+
+    contents = \
+    "\n\
+s_mov_b32 s[sgprGSUSync] 1\n\
+s_atomic_add s[sgprGSUSync], s[sgprKernArgAddress:sgprKernArgAddress+1], "+offset+" glc\n\
+s_waitcnt vmcnt(0)                                 // 8wait for global read\n\
+\n\
+label_ZEROINGEND:                              // jump to end\n\
+//zeroing\n"
+    module.addGSUSYNC(contents)
     return module
 
   ##############################################################################
@@ -1964,6 +2042,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if self.states.doShadowInit:
         module.add(self.openShadowInit())
         module.add(self.globalWriteWorkGroupInit(kernel))
+        # module.addComment("GSUSYNCzero") #GSUSYNC
+        # module.add(MacroInstruction("GSUSYNCzero", args=[]))
+        module.add(self.GSUSYNCzero(kernel, kernel["GlobalSplitU"]))
         if self.states.doShadowInit == 2:
           module.add(self.initC(kernel)) # initC while waiting for global reads
           if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
@@ -2082,7 +2163,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if not kernel["SuppressNoLoadLoop"]:
         if kernel["KernelLanguage"] == "Assembly" and kernel["OptNoLoadLoop"] and \
            kernel["BufferLoad"] and kernel["BufferStore"] and self.states.doShadowInit and \
-           kernel["LocalSplitU"]==1 and kernel["GlobalSplitU"] == 1 and \
+           kernel["LocalSplitU"]==1 and \
            self.states.actualSummationLoops==1:
 
           # two different noLoadLoops:
@@ -2093,6 +2174,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           self.saveLocalPointers(kernel, tensorParametersA, tensorParametersB)
           # deepCopy packCode for OptNLL noLoadLoop
           deepCopyPack = fastdeepcopy(pack)
+          module.addComment("GSUOpt??") #GSUSYNC
           module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, isNGLL=False, pack=deepCopyPack))
           self.restoreLocalPointers(kernel, tensorParametersA, tensorParametersB)
         module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=False, pack=pack))
@@ -2260,6 +2342,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, -1, finalLoop))
       # always emit the skip-tail-loop label
       module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, -1, None, emitEndLabelOnly=True))
+      # module.addComment("GSUSYNC34") #GSUSYNC
+      # labelname1 = "label_BUSYWAIT"
+      # labelname1 = self.labels.getNameInc(labelname1)
+      # module.addGSUSYNC("\n") #GSUSYNC
+      # module.add(MacroInstruction("GSUSYNC1", \
+      #        args=[labelname1, "label_KernelEnd"]))
+      # module.addGSUSYNC("\n") #GSUSYNC
       # tail: close
       self.states.inTailLoop = False
 
@@ -2273,9 +2362,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     for i in reversed(range(self.states.otherSummationLoops)):
       module.addComment1("global read inc AB")
       module.add(self.globalReadIncrementAB(kernel, tensorParametersA, tensorParametersB, i, 0))
+      # module.addComment("GSUSYNC56") #GSUSYNC
       module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, i, True))
-
-    module.add(self.endSummation(kernel, tensorParametersA, tensorParametersB))
+    endSumLabel = "Summation_End_OptNLL2"
+    module.add(self.endSummation(kernel, tensorParametersA, tensorParametersB, endSumLabel))
     if not self.states.doShadowInit:
       module.add(self.globalWriteWorkGroupInit(kernel))
 
@@ -3336,6 +3426,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("NumWorkGroups0", 1)
     self.defineSgpr("NumWorkGroups1", 1)
 
+# <<<<<<< HEAD
+#     # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+#     if kernel["ProblemType"]["UseScaleDVec"]:
+#       self.defineSgpr("SrdScaleDVec", 4, 4)# asm input interface
+
+#     # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+#     if kernel["ProblemType"]["UseScaleAlphaVec"]:
+#       self.defineSgpr("SrdScaleAlphaVec", 4, 4)# asm input interface
+
+# =======
+# >>>>>>> f65ce67... Move AddressScaleDVec to epilogue section
     ###################################
     # Get kernel argument start here
     ###################################
@@ -3354,6 +3455,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("SizesSum", self.states.numSgprSizesSum)
     self.defineSgpr("AddressD", numSgprAddressD)
     self.defineSgpr("AddressC", numSgprAddressC)
+    # self.defineSgpr("AddressTC", numSgprAddressTC)
+
     self.defineSgpr("AddressA", numSgprAddressA)
     self.defineSgpr("AddressB", numSgprAddressB)
     if kernel["ProblemType"]["SparseA"]:
@@ -3362,6 +3465,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["ProblemType"]["UseBeta"]:
       self.defineSgpr("Beta", numSgprBeta, numSgprBeta)
     #asm input interface depen
+
     self.defineSgpr("StridesD", self.states.d.numSgprStrides)
     self.defineSgpr("StridesC", self.states.c.numSgprStrides)
     self.defineSgpr("StridesA", self.states.a.numSgprStrides)
@@ -3379,6 +3483,20 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("MagicNumberSize%s"%idxChar, 1)
       self.defineSgpr("MagicShiftSize%s"%idxChar, 1)
 
+    GSUFusion = 0
+    # activation??
+    # if kernel["ProblemType"]["UseScaleDVec"] == False \
+    # and kernel["ProblemType"]["UseBias"] == False \
+    # and kernel["_GlobalAccumulation"] == 'MultipleBuffer' \
+    # and kernel["GlobalSplitU"] > 1:
+    if kernel["_GlobalAccumulation"] == 'MultipleBuffer' \
+    and kernel["GlobalSplitU"] > 1:
+      self.defineSgpr("AddressTC", numSgprAddressD)
+      self.defineSgpr("GSUSync", 1)
+      # self.defineSgpr("AddressDd", 2)
+      # self.defineSgpr("AddressCc", 2)
+      GSUFusion = 1
+    # self.defineSgpr("GSUSync", 1)
     #------------------------
     # Registers defined below this point are not available in the post-loop
     # Post-loop is after tail loop exits, ie the store code.
@@ -3391,7 +3509,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAlpha + numSgprAddressMetadata + \
       (numSgprBeta if kernel["ProblemType"]["UseBeta"] else 0) + \
       self.states.d.numSgprStrides + self.states.c.numSgprStrides + self.states.a.numSgprStrides + self.states.b.numSgprStrides + self.states.m.numSgprStrides + \
-      len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2
+      len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + \
+      (numSgprAddressD if GSUFusion == 1 else 0)
     # Get kernel argument end here
     ###################################
 
@@ -3487,10 +3606,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
           self.states.useBias = DataDirection.WRITE
         elif kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B":
           self.states.useBias = DataDirection.WRITE
-      elif kernel["GlobalSplitU"] == 1:
+      # elif kernel["GlobalSplitU"] == 1:
+      elif 1:
         self.states.useBias = DataDirection.READ
       # Need bias type if the kernel supports multiple bias type.
-    if self.states.useBias == DataDirection.READ or (self.states.useBias == DataDirection.WRITE and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B") and kernel["GlobalSplitU"] == 1):
+    # if self.states.useBias == DataDirection.READ or (self.states.useBias == DataDirection.WRITE and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B") and kernel["GlobalSplitU"] == 1):
+    if self.states.useBias == DataDirection.READ or (self.states.useBias == DataDirection.WRITE and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B")):
       self.states.needBiasType = True
     else:
       self.states.needBiasType = False
@@ -4102,7 +4223,8 @@ for codeObjectFileName in codeObjectFileNames:
     return bytearrayFileName
 
   def getReplacementKernelPath(self, kernel):
-    if not isCustomKernelConfig(kernel):
+    # if not kernel["ReplacementKernel"] and not isCustomKernelConfig(kernel): #kernel["CustomKernelName"]:
+    if not isCustomKernelConfig(kernel): #kernel["CustomKernelName"]:
       return None
 
     kernelName = self.getKernelName(kernel)
@@ -4134,18 +4256,24 @@ for codeObjectFileName in codeObjectFileNames:
     return fileString
 
   def _getKernelObjectAssemblyFile(self, kernel):
+    print("Victor _getKernelObjectAssemblyFile")
+
     asmPath = self.getAssemblyDirectory()
     # write assembly file to assembly directory
     kernelName = self.getKernelFileBase(kernel)
     fileBase = os.path.join(asmPath, kernelName )
     assemblyFileName = "%s.s" % fileBase
 
+    print("Victor getKernelObjectAssemblyFile assemblyFileName %s" % assemblyFileName)
     replacementKernel = self.getReplacementKernelPath(kernel)
+    print("Victor getKernelObjectAssemblyFile getReplacementKernelPath done")
 
     if replacementKernel is not None:
+      print(self.states.kernel)
       self.tPA = tensorParametersA = {}
       self.tPB = tensorParametersB = {}
       if isCustomKernelConfig(kernel):
+        print("Victor getKernelObjectAssemblyFile isCustomKernelConfig")
         kernelFoundMessage = "Custom kernel filename "
         # ISA version, such as 803
         self.states.kernel = kernel
@@ -4158,26 +4286,41 @@ for codeObjectFileName in codeObjectFileNames:
           print("warning: ISA:", self.version, " is not supported; overriding with ", defaultIsa)
           self.states.version = defaultIsa
       else:
+        print("Victor getKernelObjectAssemblyFile isCustomKernelConfig")
         kernelFoundMessage = "replacement_assemblyFilename "
         self.initKernel(kernel, tensorParametersA, tensorParametersB )
 
       shutil.copyfile(replacementKernel, assemblyFileName)
-      if globalParameters["PrintLevel"] >= 2:
+      if 1: #globalParameters["PrintLevel"] >= 2:
         print(kernelFoundMessage + assemblyFileName)
         print(self.states.kernel)
     else:
       kernelSource = self._getKernelSource(kernel)
 
-      if globalParameters["PrintLevel"] >= 2:
+      if 1: #globalParameters["PrintLevel"] >= 2:
         print("write_assemblyFilename %s" % assemblyFileName)
         print(self.states.kernel)
 
       with open(assemblyFileName, 'w') as assemblyFile:
         assemblyFile.write(kernelSource)
 
+    # print("Victor _getKernelObjectAssemblyFile write_assemblyFilename %s" % assemblyFileName)
+    # kernelSource = self._getKernelSource(kernel)
+    # print("Victor _getKernelObjectAssemblyFile _getKernelSource done")
+
+    # if globalParameters["PrintLevel"] >= 2:
+    #   print("write_assemblyFilename %s" % assemblyFileName)
+
+    # with open(assemblyFileName, 'w') as assemblyFile:
+    #   assemblyFile.write(kernelSource)
+
+    print("Victor getKernelObjectAssemblyFile end")
+    print(self.states.kernel)
+
     return assemblyFileName
 
   def _getAssembledKernelObjectFile(self, kernel):
+    print("Victor _getAssembledKernelObjectFile")
     assemblyFileName = self._getKernelObjectAssemblyFile(kernel)
 
     base, ext = os.path.splitext(assemblyFileName)
@@ -4192,6 +4335,7 @@ for codeObjectFileName in codeObjectFileNames:
     return objectFileName
 
   def _getSingleCodeObjectFile(self, kernel):
+    print("Victor getSingleCodeObjectFile")
     objectFileName = self._getAssembledKernelObjectFile(kernel)
 
     base, ext = os.path.splitext(objectFileName)
@@ -4242,7 +4386,8 @@ for codeObjectFileName in codeObjectFileNames:
      * A code object file
      * A Python script which can create byte array variable definitions.
     """
-
+    print("Victor getSourceFileString begin")
+    print(self.states.kernel)
     try:
       if kernel["KernelLanguage"] == "Assembly":
         # asmPath = self.getAssemblyDirectory()
@@ -4256,6 +4401,8 @@ for codeObjectFileName in codeObjectFileNames:
         if globalParameters["GenerateSourcesAndExit"]:
           # only create the assembly file.
           self._getKernelObjectAssemblyFile(kernel)
+          print("Victor getSourceFileString _getKernelObjectAssemblyFile end")
+          print(self.states.kernel)
           return (0, "")
         else:
           self._writeByteArrayScript()
@@ -4263,9 +4410,13 @@ for codeObjectFileName in codeObjectFileNames:
 
           # I guess in this case we are making sure that the code object file exists by executing the code
           # above but we aren't placing it into the source.
+          print("Victor getSourceFileString _getSingleCodeObjectFile end")
+          print(self.states.kernel)
           return (0, "")
 
       else:
+        print("Victor getSourceFileString end")
+        print(self.states.kernel)
         return (0, self._getKernelSource(kernel))
 
     except subprocess.CalledProcessError as exc:
@@ -4293,6 +4444,8 @@ for codeObjectFileName in codeObjectFileNames:
   # Compile Args
   ##############################################################################
   def getCompileArgs(self, sourceFileName, objectFileName, *moreArgs, isa=None, wavefrontSize=None):
+    print("Victor getCompileArgs")
+    print(self.states.kernel)
     if isa is None:
       isa = self.states.version
     if wavefrontSize is None:

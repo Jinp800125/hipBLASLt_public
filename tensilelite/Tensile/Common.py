@@ -154,6 +154,7 @@ globalParameters["DataInitTypeAlpha"] = 2
 globalParameters["DataInitTypeBeta"] = 2
 globalParameters["DataInitTypeBias"] = 3
 globalParameters["DataInitTypeScaleDVec"] = 3
+globalParameters["DataInitTypeScaleAlphaVec"] = 3
 globalParameters["DataInitValueActivationArgs"] = [2.0, 2.0]
 globalParameters["CEqualD"] = False               # Set to true if testing for the case where the pointer to C is the same as D.
 # When this parameter is set to 0, the Tensile client will use srand(time(NULL)).
@@ -183,7 +184,7 @@ globalParameters["PrintTensorD"] = 0          # Print TensorD.  0x1=after init; 
 globalParameters["PrintTensorRef"] = 0          # Print reference tensor.  0x1=after init; 0x2=after copy-back; 0x3=both
 globalParameters["PrintIndexAssignments"] = 0      # Print the tensor index assignment info
 globalParameters["PrintWinnersOnly"] = False      # Only print the solutions which become the fastest
-globalParameters["PrintCodeCommands"] = False  # print the commands used to generate the code objects (asm,link,hip-clang, etc)
+globalParameters["PrintCodeCommands"] = True  # print the commands used to generate the code objects (asm,link,hip-clang, etc)
 globalParameters["DumpTensors"] = False        # If True, dump tensors to binary files instead of printing them.
 
 # If PrintMax* is greater than the dimension, the middle elements will be repaced with "..."
@@ -1086,6 +1087,7 @@ defaultProblemType = {
     "UseBias":                  False,            # =True use bias vector
     "BiasSrc":                  "D",              # This parameter is used in gradient + bias. Support A, B, D.
     "UseScaleDVec":                False,            # =True use scaleD vector
+    "UseScaleAlphaVec":                False,            # =True use scaleAlpha vector
     "HighPrecisionAccumulate":  False,            # f32 += f16*f16
     "SilentHighPrecisionAccumulate": False,       # Keep kernel names the same for HPA mode.  Useful for testing.
 

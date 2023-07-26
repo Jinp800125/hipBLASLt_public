@@ -72,6 +72,12 @@ class SignatureCOV3(Signature):
         biasValueType = "void"
         actValueType  = kernel["ProblemType"]["ActivationComputeDataType"].toNameAbbrev()
 
+        for i in range(0, writer.states.numSgprSizesFree):
+            signature.addArg(            "SizesFree%u"%i, SVK.SIG_VALUE,               "u32")
+
+        for i in range(0, writer.states.numSgprSizesSum):
+            signature.addArg(             "SizesSum%u"%i, SVK.SIG_VALUE,               "u32")
+
         if globalParameters["DebugKernel"]:
             signature.addArg("AddressDbg", SVK.SIG_GLOBALBUFFER, "struct", "generic")
         signature.addArg(    "D", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
@@ -104,23 +110,32 @@ class SignatureCOV3(Signature):
             for i in range(0, writer.states.m.numSgprStrides):
                 signature.addArg(   "strideMetadata%u"%i, SVK.SIG_VALUE,               "u32")
 
-        for i in range(0, writer.states.numSgprSizesFree):
-            signature.addArg(            "SizesFree%u"%i, SVK.SIG_VALUE,               "u32")
+        # for i in range(0, writer.states.numSgprSizesFree):
+        #     signature.addArg(            "SizesFree%u"%i, SVK.SIG_VALUE,               "u32")
 
-        for i in range(0, writer.states.numSgprSizesSum):
-            signature.addArg(             "SizesSum%u"%i, SVK.SIG_VALUE,               "u32")
+        # for i in range(0, writer.states.numSgprSizesSum):
+        #     signature.addArg(             "SizesSum%u"%i, SVK.SIG_VALUE,               "u32")
 
         for idxChar in kernel["PackedC0IdxChars"][:-1]:
             signature.addArg("MagicNumberSize%s"%idxChar, SVK.SIG_VALUE,               "u32")
             signature.addArg( "MagicShiftSize%s"%idxChar, SVK.SIG_VALUE,               "u32")
 
-        if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+        if (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBuffer'):
+            # signature.addArg(               "GSUSync", SVK.SIG_VALUE,              "u32")
+            signature.addArg(    "dstD", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+
+        # if kernel["ProblemType"]["UseScaleDVec"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleDVec"]:
             signature.addArg("AddressScaleDVec", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
+        # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleAlphaVec"]:
+            signature.addArg("AddressScaleAlphaVec", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
 
         if writer.states.useBias == DataDirection.READ:
             signature.addArg("bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")
         # We append the data in ws_d
-        elif writer.states.useBias == DataDirection.WRITE and (kernel["GlobalSplitU"] == 1):
+        # elif writer.states.useBias == DataDirection.WRITE and (kernel["GlobalSplitU"] == 1):
+        elif writer.states.useBias == DataDirection.WRITE:
             signature.addArg("ws_bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")
 
         if writer.states.needBiasType:
@@ -136,7 +151,8 @@ class SignatureCOV3(Signature):
                 signature.addArg("StrideE%u"%i,        SVK.SIG_VALUE,        "u32")
 
 
-        if ((kernel["ProblemType"]["ActivationType"] != 'none') and (kernel["GlobalSplitU"] == 1) \
+        # if ((kernel["ProblemType"]["ActivationType"] != 'none') and (kernel["GlobalSplitU"] == 1) \
+        if ((kernel["ProblemType"]["ActivationType"] != 'none') \
             and kernel["ActivationFused"]):
             if kernel["ProblemType"]["ActivationComputeDataType"].isHalf():
                 actValueType = 'pkf16'
@@ -144,6 +160,9 @@ class SignatureCOV3(Signature):
                 signature.addArg(                   name, SVK.SIG_VALUE,        actValueType)
             if kernel["ProblemType"]["ActivationType"] == 'all':
                 signature.addArg(       "activationType", SVK.SIG_VALUE,               "u32")
+
+        if (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBuffer'):
+            signature.addArg(               "GSUSync", SVK.SIG_VALUE,              "u32")
 
         self.addOptConfigComment(signature,
                                 tt=[kernel["ThreadTile0"], kernel["ThreadTile1"]],

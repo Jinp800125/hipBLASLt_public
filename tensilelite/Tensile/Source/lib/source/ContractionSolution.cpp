@@ -381,7 +381,8 @@ namespace Tensile
         if(sizeMapping.globalAccumulation)
         {
             args.template append<void const*>("ws_d", (uint8_t*)inputs.ws + workspaceOffsetInByte);
-            if(sizeMapping.customKernelName != "")
+            // if (sizeMapping.customKernelName != "")
+            if (1)
             {
                 args.template append<void const*>("c", inputs.c);
             }
@@ -473,24 +474,40 @@ namespace Tensile
                                                metadata.strides()[i]);
         }
 
-        if((sizeMapping.globalAccumulation == 2) && (sizeMapping.customKernelName != ""))
+        // if((sizeMapping.globalAccumulation == 2) && (sizeMapping.customKernelName != ""))
+        if((sizeMapping.globalAccumulation == 2))
         {
+            // args.template append<uint32_t>("GSUSync", 0);
             args.template append<void const*>("dstD", inputs.d);
         }
-
-        if(problemType.useScaleDVec
-           && ((sizeMapping.globalSplitU == 1)
-               || (sizeMapping.customKernelName != ""))) //kernel input data
+        // args.append<uint32_t>("GSUSync", wgmRemainder1);
+        // if(problemType.useScaleDVec
+        //    && ((sizeMapping.globalSplitU == 1)
+        //        || (sizeMapping.customKernelName != ""))) //kernel input data
+        if(problemType.useScaleDVec) //kernel input data
         {
             args.template append<void const*>("scaleDVec", inputs.scaleDVec);
         }
 
+        // if(problemType.useScaleAlphaVec
+        //    && ((sizeMapping.globalSplitU == 1)
+        //        || (sizeMapping.customKernelName != ""))) //kernel input data
+        if(problemType.useScaleAlphaVec) //kernel input data
+        {
+            args.template append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
+        }
+
         bool runActivation = false;
+        // if((problemType.activationType != ActivationType::None) && sizeMapping.activationFused
+        //    && (sizeMapping.globalSplitU == 1))
+        // if((problemType.activationType != ActivationType::None) && sizeMapping.activationFused
+        //    && ((sizeMapping.globalSplitU == 1) || (sizeMapping.customKernelName != "")))
         if((problemType.activationType != ActivationType::None) && sizeMapping.activationFused
-           && ((sizeMapping.globalSplitU == 1) || (sizeMapping.customKernelName != "")))
+           )
             runActivation = true;
-        if(problemType.useBias
-           && ((sizeMapping.globalSplitU == 1) || (sizeMapping.customKernelName != "")))
+        // if(problemType.useBias
+           // && ((sizeMapping.globalSplitU == 1) || (sizeMapping.customKernelName != "")))
+        if(problemType.useBias)
         {
             // We save the bias data in ws_d
             if(problemType.useGradient && problem.biasSrc() == ContractionProblemGemm::TENSOR::D
@@ -501,8 +518,9 @@ namespace Tensile
                 args.template append<void const*>("bias", inputs.bias);
         }
 
+        // if(problemType.useBias
+        //    && ((sizeMapping.globalSplitU == 1) || (sizeMapping.customKernelName != ""))
         if(problemType.useBias
-           && ((sizeMapping.globalSplitU == 1) || (sizeMapping.customKernelName != ""))
            && (!problemType.useGradient
                || (problemType.useGradient
                    && (problem.biasSrc() == ContractionProblemGemm::TENSOR::A
@@ -546,6 +564,11 @@ namespace Tensile
                 args.template append<uint32_t>("activationType",
                                                static_cast<uint32_t>(problem.activationEnumArg()));
             }
+        }
+
+        if((sizeMapping.globalAccumulation == 2))
+        {
+            args.template append<uint32_t>("GSUSync", 0);
         }
     }
 
@@ -730,6 +753,45 @@ namespace Tensile
 
     template <bool T_Debug>
     KernelInvocation
+        ContractionSolution::updateUserArgsSingleCallGroupedGemm(uint32_t             gemmCount,
+                                                                 const Tensile::dim3& workGroupSize,
+                                                                 const Tensile::dim3& numWorkGroups,
+                                                                 const Tensile::dim3& numWorkItems,
+                                                                 const void*          userArgs,
+                                                                 const void* workspace) const
+    {
+        TENSILE_ASSERT_EXC(sizeMapping.workGroupMapping >= 0);
+        KernelInvocation rv;
+
+        rv.kernelName      = kernelName;
+        rv.workGroupSize.x = workGroupSize.x;
+        rv.workGroupSize.y = workGroupSize.y;
+        rv.workGroupSize.z = workGroupSize.z;
+
+        rv.numWorkGroups.x = numWorkGroups.x;
+        rv.numWorkGroups.y = numWorkGroups.y;
+        rv.numWorkGroups.z = numWorkGroups.z;
+
+        rv.numWorkItems.x = numWorkItems.x;
+        rv.numWorkItems.y = numWorkItems.y;
+        rv.numWorkItems.z = numWorkItems.z;
+
+        rv.sharedMemBytes = 0;
+
+        rv.args = KernelArguments(T_Debug);
+
+        rv.args.append<uint32_t>("gemm_count", gemmCount);
+        // For user input
+        rv.args.append<void const*>("DeviceUserArguments", userArgs);
+        rv.args.append<void const*>("argsPtr", (void*)workspace);
+        rv.args.append<uint32_t>("syncForWgTableGen", 0);
+        rv.codeObjectFile = codeObjectFilename.load();
+
+        return rv;
+    }
+
+    template <bool T_Debug>
+    KernelInvocation
         ContractionSolution::generateBetaOnlyCall(Problem const&           problem,
                                                   ContractionInputs const& inputs) const
     {
@@ -778,16 +840,24 @@ namespace Tensile
         else
             rv.args.append<void const* const*>("batchC", inputs.batchC);
 
-        if(problemType.useBias
-           && (sizeMapping.globalAccumulation == 0 || (sizeMapping.customKernelName != ""))
-           && (!problemType.useGradient))
+        // if(problemType.useBias
+        //    && (sizeMapping.globalAccumulation == 0 || (sizeMapping.customKernelName != ""))
+        //    && (!problemType.useGradient))
+        if(problemType.useBias && (!problemType.useGradient))
         {
             rv.args.append<void const*>("bias", inputs.bias);
         }
-        if(problemType.useScaleDVec
-           && (sizeMapping.globalAccumulation == 0 || (sizeMapping.customKernelName != "")))
+        // if(problemType.useScaleDVec
+        //    && (sizeMapping.globalAccumulation == 0 || (sizeMapping.customKernelName != "")))
+        if(problemType.useScaleDVec)
         {
             rv.args.append<void const*>("scaleDVec", inputs.scaleDVec);
+        }
+        // if(problemType.useScaleAlphaVec
+        //    && (sizeMapping.globalAccumulation == 0 || (sizeMapping.customKernelName != "")))
+        if(problemType.useScaleAlphaVec)
+        {
+            rv.args.append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
         }
 
         if(sizeMapping.globalAccumulation)
@@ -862,8 +932,9 @@ namespace Tensile
             name += "_GB";
         }
 
+        // if(problemType.useBias
+        //    && ((sizeMapping.globalAccumulation == 0) || (sizeMapping.customKernelName != ""))
         if(problemType.useBias
-           && ((sizeMapping.globalAccumulation == 0) || (sizeMapping.customKernelName != ""))
            && (!problemType.useGradient))
         {
             auto s = TypeAbbrev(problem.biasType());
@@ -928,6 +999,10 @@ namespace Tensile
         if(problemType.useScaleDVec) // GSU dep
         {
             args.template append<void const*>("scaleDVec", inputs.scaleDVec);
+        }
+        if(problemType.useScaleAlphaVec) // GSU dep
+        {
+            args.template append<void const*>("scaleAlphaVec", inputs.scaleAlphaVec);
         }
 
         if(sizeMapping.globalAccumulation == 2)
@@ -1311,6 +1386,10 @@ namespace Tensile
         {
             name += ("_ScaleDVec");
         }
+        if(problemType.useScaleAlphaVec)
+        {
+            name += ("_ScaleAlphaVec");
+        }
 
         name += "_PostGSU" + std::to_string(gsu);
 
@@ -1672,12 +1751,19 @@ namespace Tensile
         else
             rv.push_back(generateSingleCall<false>(problem, inputs));
 
-        if((sizeMapping.customKernelName == "") && sizeMapping.globalAccumulation)
+        //std::cout << "Running customKernelName: " << sizeMapping.customKernelName << std::endl;
+        //std::cout << "Running globalAccumulation: " << sizeMapping.globalAccumulation << std::endl;
+
+        // if(sizeMapping.globalAccumulation)
+        // if(sizeMapping.globalSplitU > 1 && sizeMapping.globalAccumulation != 1) // only mutibuffer
+        if (0)
+        // if((sizeMapping.customKernelName == "") && sizeMapping.globalAccumulation)
         {
             if(debug)
                 rv.push_back(generateOutputConversionCall<true>(problem, inputs));
             else
                 rv.push_back(generateOutputConversionCall<false>(problem, inputs));
+            std::cout << "Running generateOutputConversionCall: "  << std::endl;
         }
 
         if(((sizeMapping.globalSplitU > 1 && (!sizeMapping.globalAccumulation))
@@ -1688,6 +1774,7 @@ namespace Tensile
                 rv.push_back(generateActivationOnlyCall<true>(problem, inputs));
             else
                 rv.push_back(generateActivationOnlyCall<false>(problem, inputs));
+            std::cout << "Running generateActivationOnlyCall: "  << std::endl;
         }
 
         // The reduction of A is done in ConversionKernel when GSU > 1 in MultipleBuffer mode
@@ -1816,6 +1903,9 @@ namespace Tensile
         else
             rv.push_back(generateSingleCallGroupedGemm<false>(problems, inputs, h_args));
 
+        // if(sizeMapping.globalAccumulation)
+        // if(sizeMapping.globalSplitU > 1 && sizeMapping.globalAccumulation != 1) // only mutibuffer
+        // if (0)
         if((sizeMapping.customKernelName == "") && sizeMapping.globalAccumulation)
         {
             if(debug)

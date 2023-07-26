@@ -317,6 +317,14 @@ namespace Tensile
                                                        void const* userArgs = nullptr) const;
 
         template <bool T_Debug>
+        KernelInvocation updateUserArgsSingleCallGroupedGemm(uint32_t             gemmCount,
+                                                             const Tensile::dim3& workGroupSize,
+                                                             const Tensile::dim3& numWorkGroups,
+                                                             const Tensile::dim3& numWorkItems,
+                                                             const void*          userArgs,
+                                                             const void*          workspace) const;
+
+        template <bool T_Debug>
         KernelInvocation generateBetaOnlyCall(Problem const&           problem,
                                               ContractionInputs const& inputs) const;
 
@@ -425,6 +433,7 @@ namespace Tensile
             bool                  useBias                   = false;
             bool                  useE                      = false;
             bool                  useScaleDVec              = false;
+            bool                  useScaleAlphaVec          = false;
             bool                  useInitialStridesAB       = false;
             bool                  useInitialStridesCD       = false;
             bool                  stridedBatched            = true;

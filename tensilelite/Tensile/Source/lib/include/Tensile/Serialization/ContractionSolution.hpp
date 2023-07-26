@@ -100,6 +100,8 @@ namespace Tensile
                 iot::mapOptional(io, "activationFused", s.activationFused);
 
                 iot::mapOptional(io, "CustomKernelName", s.customKernelName);
+                // std::cout << "mapping customKernelName: " << s.customKernelName << std::endl;
+                // std::cout << "mapping globalAccumulation: " << s.globalAccumulation << std::endl;
             }
 
             const static bool flow = false;
@@ -126,6 +128,7 @@ namespace Tensile
                 iot::mapOptional(io, "useBias", s.useBias);
                 iot::mapOptional(io, "useE", s.useE);
                 iot::mapOptional(io, "useScaleDVec", s.useScaleDVec);
+                iot::mapOptional(io, "useScaleAlphaVec", s.useScaleAlphaVec);
                 iot::mapRequired(io, "highPrecisionAccumulate", s.highPrecisionAccumulate);
                 iot::mapOptional(io, "useInitialStridesAB", s.useInitialStridesAB);
                 iot::mapOptional(io, "useInitialStridesCD", s.useInitialStridesCD);

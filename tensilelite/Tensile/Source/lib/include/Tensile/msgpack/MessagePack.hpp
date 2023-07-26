@@ -158,16 +158,28 @@ namespace Tensile
             template <typename T>
             void mapOptional(const char* key, T& obj)
             {
+                // std::cout << "mapOptional: "<< std::endl;
                 if(objectMap.empty())
                     objectToMap(object, objectMap);
 
+                // for(auto &n : objectMap)
+                    // std::cout << "objectToMap key: " << n.first << " value: "  << n.second << std::endl;
+
                 auto iterator = objectMap.find(key);
+
+                // for (std::unordered_map<std::string, int>::iterator it = umap.begin(); it != umap.end(); it++) {
+                    // or
+                // for (auto iterator = objectMap.begin(); iterator != objectMap.end(); iterator++) {
+                    // std::cout << "name: " << (*iterator).first << ", value: " << (*iterator).second << "\n";
+                // }
+
                 if(iterator != objectMap.end())
                 {
                     auto& value = iterator->second;
                     createSubRef(value).input(obj);
                     if(Tensile::Debug::Instance().printDataInit())
                         usedKeys.insert(key);
+                    // std::cout << "iterator != empty: " << std::endl;
                 }
             }
 
@@ -292,6 +304,7 @@ namespace Tensile
             template <typename T>
             static void mapOptional(MessagePackInput& io, const char* key, T& obj)
             {
+                // std::cout << "IOTraits mapOptional: " << std::endl;
                 io.mapOptional(key, obj);
             }
 

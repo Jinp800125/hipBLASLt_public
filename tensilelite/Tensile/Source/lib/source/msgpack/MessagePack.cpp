@@ -63,6 +63,8 @@ namespace Tensile
                 }
 
                 result[key] = std::move(element.val);
+                // std::cout << "objectToMap result: " << result[key] << std::endl;
+                // std::cout << "objectToMap key: " << key << std::endl;
             }
         }
     }
@@ -117,7 +119,7 @@ namespace Tensile
 
             return nullptr;
         }
-
+        // std::cout << "MessagePackLoadLibraryFile" << std::endl;
         // copy data from msgpack::object_handle into MasterSolutionLibrary
         try
         {
@@ -154,6 +156,7 @@ namespace Tensile
     std::shared_ptr<SolutionLibrary<MyProblem, MySolution>>
         MessagePackLoadLibraryData(std::vector<uint8_t> const& data)
     {
+
         try
         {
             std::shared_ptr<MasterSolutionLibrary<MyProblem, MySolution>> rv;
@@ -161,7 +164,7 @@ namespace Tensile
             auto result = msgpack::unpack((const char*)data.data(), data.size());
             LibraryIOContext<MySolution>    context{std::string(""), {}, nullptr};
             Serialization::MessagePackInput min(result.get(), &context);
-
+            // std::cout << "MessagePackLoadLibraryData" << std::endl;
             Serialization::PointerMappingTraits<Tensile::MasterContractionLibrary,
                                                 Serialization::MessagePackInput>::mapping(min, rv);
 

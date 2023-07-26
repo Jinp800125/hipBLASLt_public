@@ -273,6 +273,7 @@ typedef enum rocblaslt_matmul_desc_attributes_
     ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_POINTER      = 6,
     ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_LD           = 7,
     ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE = 8,
+    ROCBLASLT_MATMUL_DESC_ALPHA_SCALE_VECTOR_POINTER    = 99,
     ROCBLASLT_MATMUL_DESC_D_SCALE_VECTOR_POINTER    = 100,
     ROCBLASLT_MATMUL_DESC_MAX                       = 101
 } rocblaslt_matmul_desc_attributes;
@@ -365,6 +366,7 @@ namespace rocblaslt
         // Epilogue inputs
         void* bias      = nullptr;
         void* scaleDVec = nullptr;
+        void* scaleAlphaVec = nullptr;
         void* aux       = nullptr;
     };
 

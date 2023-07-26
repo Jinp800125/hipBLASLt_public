@@ -706,9 +706,27 @@ namespace Tensile
                 Accumulator beta  = constVariantCast<Accumulator>(inputs.beta);
                 auto        zero  = static_cast<Accumulator>(0);
 
-                auto resultD = multiply<Accumulator>(alpha, value)
-                               + ((beta == zero) ? static_cast<Accumulator>(zero)
-                                                 : multiply<Accumulator>(beta, cPtr[cIndex]));
+                // auto resultD = multiply<Accumulator>(alpha, value)
+                //                + ((beta == zero) ? static_cast<Accumulator>(zero)
+                //                                  : multiply<Accumulator>(beta, cPtr[cIndex]));
+
+                // std::cout << "Victor beta: " << beta << std::endl;
+                // std::cout << "Victor cPtr[cIndex]: " << cPtr[cIndex] << std::endl;
+
+                auto resultD = multiply<Accumulator>(alpha, value);
+
+                if(problem.useScaleAlphaVec())
+                {
+                    int         pos       = int(dNum % problem.d().sizes()[0]);
+                    Accumulator scaleAlphaVec = GetValue<Accumulator>(
+                        problem.alphaType(), inputs.scaleAlphaVec, pos, aConjugate);
+                    resultD *= scaleAlphaVec;
+                }
+
+                if(beta != zero)
+                {
+                    resultD += multiply<Accumulator>(beta, cPtr[cIndex]);
+                }
 
                 // bias
                 if(problem.useBias() && inputs.bias && !problem.useGradient())
@@ -759,6 +777,13 @@ namespace Tensile
                         problem.alphaType(), inputs.scaleDVec, pos, aConjugate);
                     resultD *= scaleDVec;
                 }
+                // if(problem.useScaleAlphaVec())
+                // {
+                //     int         pos       = int(dNum % problem.d().sizes()[0]);
+                //     Accumulator scaleAlphaVec = GetValue<Accumulator>(
+                //         problem.alphaType(), inputs.scaleAlphaVec, pos, aConjugate);
+                //     resultD *= scaleAlphaVec;
+                // }
                 if(problem.useBias() && problem.useGradient()
                    && (problem.biasSrc() == ContractionProblemGemm::D))
                 {
