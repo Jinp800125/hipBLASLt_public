@@ -7474,7 +7474,7 @@ class KernelWriterAssembly(KernelWriter):
     # if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
     if kernel["ProblemType"]["UseScaleAlphaVec"]:
       labelStr = self.labels.getNameInc("ScaleAlphaVec")
-      module.add(allocPostLoopSrdSuppress("ScaleDVec", labelStr, sgprLength=sgpr("SizeI")))
+      module.add(allocPostLoopSrdSuppress("ScaleAlphaVec", labelStr, sgprLength=sgpr("SizeI")))
       module.add(SMulI32(dst=sgpr("SrdScaleAlphaVec+2"), src0=hex(self.states.bpeCinternal), src1=sgpr("SrdScaleAlphaVec+2"), comment="ScaleAlphaVec scaled by BPE"))# scaled by BPE
     # Add bias lds
     if self.states.useBias == DataDirection.READ:
@@ -8279,13 +8279,13 @@ class KernelWriterAssembly(KernelWriter):
 
       if kernel["ProblemType"]["ComputeDataType"].isHalf() or kernel["ProblemType"]["ComputeDataType"].isBFloat16():
         module.add(self.chooseGlobalRead(useBuffer, bps, scaleAlphaVecVgpr, \
-                          addr0, addr1, soffset=0, offset=addrCalc.scaleAlphaVecOffset, hasGLCModifier=self.states.asmCaps["HasGLCModifier"], hi16=0, comment="load scaleAlphaVecH"))
+                          addr0, addr1, soffset=0, offset=addrCalc.scaleAlphaVecOffset, hi16=0, comment="load scaleAlphaVecH"))
       elif kernel["ProblemType"]["ComputeDataType"].isInt32() or kernel["ProblemType"]["ComputeDataType"].isSingle():
         module.add(self.chooseGlobalRead(useBuffer, bps, scaleAlphaVecVgpr, \
-                          addr0, addr1, soffset=0, offset=addrCalc.scaleAlphaVecOffset, hasGLCModifier=self.states.asmCaps["HasGLCModifier"], comment="load scaleAlphaVecI"))
+                          addr0, addr1, soffset=0, offset=addrCalc.scaleAlphaVecOffset, comment="load scaleAlphaVecI"))
       elif kernel["ProblemType"]["ComputeDataType"].isDouble() or kernel["ProblemType"]["ComputeDataType"].isSingleComplex() :
         module.add(self.chooseGlobalRead(useBuffer, bps, scaleAlphaVecVgpr, \
-                          addr0, addr1, soffset=0, offset=addrCalc.scaleAlphaVecOffset, hasGLCModifier=self.states.asmCaps["HasGLCModifier"], comment="load scaleAlphaVec"))
+                          addr0, addr1, soffset=0, offset=addrCalc.scaleAlphaVecOffset, comment="load scaleAlphaVec"))
       else:
         printExit("Unsupported scaleAlphaVec type %s."%(str(kernel["ProblemType"]["ComputeDataType"])))
 

@@ -1924,8 +1924,16 @@ buffer_store_dwordx2 v[0:1], v4, s[sgprSrdDd:sgprSrdDd+3], 0 offen offset:4*"+st
 buffer_store_dword v[0], v4, s[sgprSrdDd:sgprSrdDd+3], 0 offen offset:4*"+str(i)+"+2 // \n"
     module.addGSUSYNC(contents)
 
-    if kernel["ProblemType"]["UseScaleDVec"]:
+    if (kernel["ProblemType"]["UseScaleDVec"]) and (kernel["ProblemType"]["UseBias"]) and (not kernel["ProblemType"]["UseScaleAlphaVec"]):
       offset = "0x84"
+    elif (not kernel["ProblemType"]["UseScaleDVec"]) and (kernel["ProblemType"]["UseBias"]) and (kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x84"
+    elif (not kernel["ProblemType"]["UseScaleDVec"]) and (kernel["ProblemType"]["UseBias"]) and (not kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x7C"
+    elif (kernel["ProblemType"]["UseScaleDVec"]) and (not kernel["ProblemType"]["UseBias"]) and (not kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x6C"
+    elif (kernel["ProblemType"]["UseScaleDVec"]) and (kernel["ProblemType"]["UseBias"]) and (kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x8C"
     else:
       offset = "0x60"
 

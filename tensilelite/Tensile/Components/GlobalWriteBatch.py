@@ -192,8 +192,16 @@ class GlobalWriteBatchWriter:
     else:
         WaveNum = "MT0/MT1"
 
-    if self.kernel["ProblemType"]["UseScaleDVec"]:
+    if (self.kernel["ProblemType"]["UseScaleDVec"]) and (self.kernel["ProblemType"]["UseBias"]) and (not self.kernel["ProblemType"]["UseScaleAlphaVec"]):
       offset = "0x84"
+    elif (not self.kernel["ProblemType"]["UseScaleDVec"]) and (self.kernel["ProblemType"]["UseBias"]) and (self.kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x84"
+    elif (not self.kernel["ProblemType"]["UseScaleDVec"]) and (self.kernel["ProblemType"]["UseBias"]) and (not self.kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x7C"
+    elif (self.kernel["ProblemType"]["UseScaleDVec"]) and (not self.kernel["ProblemType"]["UseBias"]) and (not self.kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x6C"
+    elif (self.kernel["ProblemType"]["UseScaleDVec"]) and (self.kernel["ProblemType"]["UseBias"]) and (self.kernel["ProblemType"]["UseScaleAlphaVec"]):
+      offset = "0x8C"
     else:
       offset = "0x60"
     contents = \
@@ -251,7 +259,7 @@ s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp3E]        // add hi to S
 \n\
 s_add_u32 s[sgprSrdDd+0], s[sgprSrdDd+0], s[sgprtmp0E]            // add lo to SRD\n\
 s_addc_u32 s[sgprSrdDd+1], s[sgprSrdDd+1], 0                      // add hi to SRD\n\
-s_buffer_atomic_add s[sgprGSUSync], s[sgprSrdDd:sgprSrdDd+3], offset:0 glc\n\
+s_buffer_atomic_add s[sgprGSUSync], s[sgprSrdDd:sgprSrdDd+3], glc\n\
 \n\
 \n\
 //s_mov_b32 s[sgprGSUSumIdx] 1\n\

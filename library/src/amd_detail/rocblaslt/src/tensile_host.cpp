@@ -599,15 +599,75 @@ namespace
 
         auto tensileAct = getTensileActivationType(prob.epilogue);
 
-        if(fallback && prob.bias == nullptr && prob.scaleDVec == nullptr && prob.E == nullptr
+        if(fallback && prob.bias == nullptr && prob.scaleDVec == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
         // if(fallback && prob.bias == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
            && tensileAct == Tensile::ActivationType::None)
         {
             tensileProblem.setUseBias(false);
             tensileProblem.setActivationType(Tensile::ActivationType::None);
             tensileProblem.setUseScaleDVec(false);
-            // tensileProblem.setUseScaleAlphaVec(false);
+            tensileProblem.setUseScaleAlphaVec(false);
             std::cout << "Victor2" << std::endl;
+            tensileProblem.setUseE(false);
+            tensileProblem.setUseGradient(false);
+        }
+        else if(fallback && prob.bias != nullptr && prob.scaleDVec == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+        // if(fallback && prob.bias == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+           && tensileAct == Tensile::ActivationType::None)
+        {
+            tensileProblem.setUseBias(true);
+            tensileProblem.setActivationType(Tensile::ActivationType::All);
+            tensileProblem.setUseScaleDVec(false);
+            tensileProblem.setUseScaleAlphaVec(false);
+            std::cout << "Victor21" << std::endl;
+            tensileProblem.setUseE(false);
+            tensileProblem.setUseGradient(false);
+        }
+        else if(fallback && prob.bias == nullptr && prob.scaleDVec != nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+        // if(fallback && prob.bias == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+           && tensileAct == Tensile::ActivationType::None)
+        {
+            tensileProblem.setUseBias(false);
+            tensileProblem.setActivationType(Tensile::ActivationType::None);
+            tensileProblem.setUseScaleDVec(true);
+            tensileProblem.setUseScaleAlphaVec(false);
+            std::cout << "Victor22" << std::endl;
+            tensileProblem.setUseE(false);
+            tensileProblem.setUseGradient(false);
+        }
+        else if(fallback && prob.bias == nullptr && prob.scaleDVec == nullptr && prob.scaleAlphaVec != nullptr && prob.E == nullptr
+        // if(fallback && prob.bias == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+           && tensileAct == Tensile::ActivationType::None)
+        {
+            tensileProblem.setUseBias(false);
+            tensileProblem.setActivationType(Tensile::ActivationType::None);
+            tensileProblem.setUseScaleDVec(false);
+            tensileProblem.setUseScaleAlphaVec(true);
+            std::cout << "Victor23" << std::endl;
+            tensileProblem.setUseE(false);
+            tensileProblem.setUseGradient(false);
+        }
+        else if(fallback && prob.bias != nullptr && prob.scaleDVec == nullptr && prob.scaleAlphaVec != nullptr && prob.E == nullptr
+        // if(fallback && prob.bias == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+           && tensileAct == Tensile::ActivationType::None)
+        {
+            tensileProblem.setUseBias(true);
+            tensileProblem.setActivationType(Tensile::ActivationType::All);
+            tensileProblem.setUseScaleDVec(false);
+            tensileProblem.setUseScaleAlphaVec(true);
+            std::cout << "Victor24" << std::endl;
+            tensileProblem.setUseE(false);
+            tensileProblem.setUseGradient(false);
+        }
+        else if(fallback && prob.bias != nullptr && prob.scaleDVec != nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+        // if(fallback && prob.bias == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+           && tensileAct == Tensile::ActivationType::None)
+        {
+            tensileProblem.setUseBias(true);
+            tensileProblem.setActivationType(Tensile::ActivationType::All);
+            tensileProblem.setUseScaleDVec(true);
+            tensileProblem.setUseScaleAlphaVec(false);
+            std::cout << "Victor25" << std::endl;
             tensileProblem.setUseE(false);
             tensileProblem.setUseGradient(false);
         }
@@ -1763,6 +1823,7 @@ inline auto getSolutions(
         tensile_prob.setUseE(false);
         std::cout << "Victor8" << std::endl;
         solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+        std::cout << "solutions_fallback.size(): " << solutions_fallback.size() << std::endl;
         // restore
         tensile_prob.setUseBias(useBias);
         tensile_prob.setActivationType(actType);
@@ -1770,6 +1831,136 @@ inline auto getSolutions(
         tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
         tensile_prob.setUseE(useE);
         std::cout << "Victor9" << std::endl;
+    }
+
+    if(scaleDVec != nullptr && scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
+    // if(scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
+       && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
+    {
+        auto useBias      = tensile_prob.useBias();
+        auto actType      = tensile_prob.activationType();
+        auto useScaleDVec = tensile_prob.useScaleDVec();
+        auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
+        auto useE         = tensile_prob.useE();
+        tensile_prob.setUseBias(false);
+        tensile_prob.setActivationType(Tensile::ActivationType::None);
+        tensile_prob.setUseScaleDVec(true);
+        tensile_prob.setUseScaleAlphaVec(false);
+        tensile_prob.setUseE(false);
+        std::cout << "Victor81" << std::endl;
+        solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+        std::cout << "solutions_fallback.size(): " << solutions_fallback.size() << std::endl;
+        // restore
+        tensile_prob.setUseBias(useBias);
+        tensile_prob.setActivationType(actType);
+        tensile_prob.setUseScaleDVec(useScaleDVec);
+        tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
+        tensile_prob.setUseE(useE);
+        std::cout << "Victor91" << std::endl;
+    }
+
+    if(scaleDVec == nullptr && scaleAlphaVec != nullptr && bias == nullptr && E == nullptr
+    // if(scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
+       && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
+    {
+        auto useBias      = tensile_prob.useBias();
+        auto actType      = tensile_prob.activationType();
+        auto useScaleDVec = tensile_prob.useScaleDVec();
+        auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
+        auto useE         = tensile_prob.useE();
+        tensile_prob.setUseBias(false);
+        tensile_prob.setActivationType(Tensile::ActivationType::None);
+        tensile_prob.setUseScaleDVec(false);
+        tensile_prob.setUseScaleAlphaVec(true);
+        tensile_prob.setUseE(false);
+        std::cout << "Victor82" << std::endl;
+        solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+        std::cout << "solutions_fallback.size(): " << solutions_fallback.size() << std::endl;
+        // restore
+        tensile_prob.setUseBias(useBias);
+        tensile_prob.setActivationType(actType);
+        tensile_prob.setUseScaleDVec(useScaleDVec);
+        tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
+        tensile_prob.setUseE(useE);
+        std::cout << "Victor92" << std::endl;
+    }
+
+    if(scaleDVec == nullptr && scaleAlphaVec == nullptr && bias != nullptr && E == nullptr
+    // if(scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
+       && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
+    {
+        auto useBias      = tensile_prob.useBias();
+        auto actType      = tensile_prob.activationType();
+        auto useScaleDVec = tensile_prob.useScaleDVec();
+        auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
+        auto useE         = tensile_prob.useE();
+        tensile_prob.setUseBias(true);
+        tensile_prob.setActivationType(Tensile::ActivationType::All);
+        tensile_prob.setUseScaleDVec(false);
+        tensile_prob.setUseScaleAlphaVec(false);
+        tensile_prob.setUseE(false);
+        std::cout << "Victor83" << std::endl;
+        solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+        std::cout << "solutions_fallback.size(): " << solutions_fallback.size() << std::endl;
+        // restore
+        tensile_prob.setUseBias(useBias);
+        tensile_prob.setActivationType(actType);
+        tensile_prob.setUseScaleDVec(useScaleDVec);
+        tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
+        tensile_prob.setUseE(useE);
+        std::cout << "Victor93" << std::endl;
+    }
+
+    if(scaleDVec != nullptr && scaleAlphaVec == nullptr && bias != nullptr && E == nullptr
+    // if(scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
+       && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
+    {
+        auto useBias      = tensile_prob.useBias();
+        auto actType      = tensile_prob.activationType();
+        auto useScaleDVec = tensile_prob.useScaleDVec();
+        auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
+        auto useE         = tensile_prob.useE();
+        tensile_prob.setUseBias(true);
+        tensile_prob.setActivationType(Tensile::ActivationType::All);
+        tensile_prob.setUseScaleDVec(true);
+        tensile_prob.setUseScaleAlphaVec(false);
+        tensile_prob.setUseE(false);
+        std::cout << "Victor84" << std::endl;
+        solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+        std::cout << "solutions_fallback.size(): " << solutions_fallback.size() << std::endl;
+        // restore
+        tensile_prob.setUseBias(useBias);
+        tensile_prob.setActivationType(actType);
+        tensile_prob.setUseScaleDVec(useScaleDVec);
+        tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
+        tensile_prob.setUseE(useE);
+        std::cout << "Victor94" << std::endl;
+    }
+
+    if(scaleDVec == nullptr && scaleAlphaVec != nullptr && bias != nullptr && E == nullptr
+    // if(scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
+       && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
+    {
+        auto useBias      = tensile_prob.useBias();
+        auto actType      = tensile_prob.activationType();
+        auto useScaleDVec = tensile_prob.useScaleDVec();
+        auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
+        auto useE         = tensile_prob.useE();
+        tensile_prob.setUseBias(true);
+        tensile_prob.setActivationType(Tensile::ActivationType::All);
+        tensile_prob.setUseScaleDVec(false);
+        tensile_prob.setUseScaleAlphaVec(true);
+        tensile_prob.setUseE(false);
+        std::cout << "Victor85" << std::endl;
+        solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+        std::cout << "solutions_fallback.size(): " << solutions_fallback.size() << std::endl;
+        // restore
+        tensile_prob.setUseBias(useBias);
+        tensile_prob.setActivationType(actType);
+        tensile_prob.setUseScaleDVec(useScaleDVec);
+        tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
+        tensile_prob.setUseE(useE);
+        std::cout << "Victor95" << std::endl;
     }
     auto solutions = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
     std::cout << "solutions.size(): " << solutions.size() << std::endl;
