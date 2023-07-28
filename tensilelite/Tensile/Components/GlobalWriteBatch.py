@@ -232,7 +232,7 @@ s_atomic_add s[sgprGSUSync], s[sgprKernArgAddress:sgprKernArgAddress+1], "+offse
 
     WaveNum = str(MT1*MT0)
 
-    GSUxWaveNum = str(hex(self.kernel["GlobalSplitU"]*MT1*MT0-1))
+    GSUxWaveNum = str(0xFFFFFFFF)
 
     contents = \
     "\n\
@@ -242,24 +242,39 @@ s_cbranch_scc0 "+str(labelname)+"           // jump if XX required\n\
 //check done\n\
 \n\
 //synchronizer check\n\
-s_mov_b32 s[sgprGSUSync] 0x1\n\
-\n\
-s_mov_b32 s[sgprtmp0E], s[sgprGSUSumIdx]                          //cal synchronizer position\n\
-s_lshl_b32 s[sgprtmp0E], s[sgprtmp0E], 2\n\
-\n\
-s_mul_hi_u32 s[sgprtmp3E], s[sgprStrideDK], "+str(GSU)+"                   // Scale by Stride\n\
-s_mul_i32 s[sgprtmp2E], s[sgprStrideDK], "+str(GSU)+"                      // Scale by Stride\n\
-s_lshl_b64 s[sgprtmp2E:sgprtmp2E+1], s[sgprtmp2E:sgprtmp2E+1], 2  // scale by bpe\n\
+// GSU Output Buffer offset: Free0 + (Free1-1)*StrideC1J + (Free2-1)*StrideCK * GSUIdx * bpe%s\n\
+s_mul_hi_u32 s[sgprtmp1E], s[sgprSizesFree+0], "+str(GSU)+" // Free0\n\
+s_mul_i32 s[sgprtmp0E], s[sgprSizesFree+0], "+str(GSU)+" // Free0\n\
+s_sub_u32 s[sgprtmp4E], s[sgprSizesFree+1], 1               // Free1\n\
+s_mul_i32 s[sgprtmp4E], s[sgprtmp4E], "+str(GSU)+"               // Free1\n\
+s_mul_hi_u32 s[sgprtmp3E], s[sgprtmp4E], s[sgprStrideC1J]            // Free1\n\
+s_mul_i32 s[sgprtmp2E], s[sgprtmp4E], s[sgprStrideC1J]               // Free1\n\
+s_add_u32 s[sgprtmp0E], s[sgprtmp0E], s[sgprtmp2E]                            // Free1\n\
+s_addc_u32 s[sgprtmp1E], s[sgprtmp1E], s[sgprtmp3E]                           // Free1\n\
+s_sub_u32 s[sgprtmp4E], s[sgprSizesFree+2], 1               // Free2\n\
+s_mul_i32 s[sgprtmp4E], s[sgprtmp4E], "+str(GSU)+"               // Free2\n\
+s_mul_hi_u32 s[sgprtmp3E], s[sgprtmp4E], s[sgprStrideCK]             // Free2\n\
+s_mul_i32 s[sgprtmp2E], s[sgprtmp4E], s[sgprStrideCK]                // Free2\n\
+s_add_u32 s[sgprtmp0E], s[sgprtmp0E], s[sgprtmp2E]                            // Free2\n\
+s_addc_u32 s[sgprtmp1E], s[sgprtmp1E], s[sgprtmp3E]                           // Free2\n\
+s_lshl_b64 s[sgprtmp0E:sgprtmp1E], s[sgprtmp0E:sgprtmp1E], 2                   // scale by bpe\n\
 \n\
 s_mov_b32 s[sgprSrdDd+2], 0x80000000\n\
 s_mov_b32 s[sgprSrdDd+3], Srd127_96                               // \n\
 \n\
-s_add_u32 s[sgprSrdDd+0], s[sgprAddressD+0], s[sgprtmp2E]         // add lo to SRD\n\
-s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp3E]        // add hi to SRD\n\
+s_add_u32 s[sgprSrdDd+0], s[sgprAddressD+0], s[sgprtmp0E]        // add lo GSU offset to SRD\n\
+s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp1E]       // add hi GSU offset to SRD\n\
+\n\
+s_mov_b32 s[sgprtmp0E], s[sgprGSUSumIdx]                          //cal synchronizer position\n\
+s_lshl_b32 s[sgprtmp0E], s[sgprtmp0E], 2\n\
 \n\
 s_add_u32 s[sgprSrdDd+0], s[sgprSrdDd+0], s[sgprtmp0E]            // add lo to SRD\n\
 s_addc_u32 s[sgprSrdDd+1], s[sgprSrdDd+1], 0                      // add hi to SRD\n\
-s_buffer_atomic_add s[sgprGSUSync], s[sgprSrdDd:sgprSrdDd+3], glc\n\
+\n\
+s_mov_b32 s[sgprGSUSync] 1\n\
+//s_buffer_atomic_add s[sgprGSUSync], s[sgprSrdDd:sgprSrdDd+3], glc\n\
+s_atomic_add s[sgprGSUSync], s[sgprSrdDd:sgprSrdDd+1], glc\n\
+//s_atomic_add s[sgprGSUSync], s[sgprKernArgAddress:sgprKernArgAddress+1], 0x8C glc\n\
 \n\
 \n\
 //s_mov_b32 s[sgprGSUSumIdx] 1\n\
@@ -276,9 +291,14 @@ s_lshl_b64 s[sgprtmp0E:sgprtmp1E], s[sgprtmp0E:sgprtmp1E], 2          // scale b
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s[sgprtmp0E]                  // add lo to SRD\n\
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], s[sgprtmp1E]                 // add hi to SRD\n\
 \n\
-s_waitcnt lgkmcnt(0)\n\
-s_cmp_ge_u32 s[sgprGSUSync], "+GSUxWaveNum+"                // s[sgprGSUSync] == GSU*WaveNum-1 ?\n\
-s_cbranch_scc0 "+str(labelendname)+" //label_GW_End_1 //label_AFTERsummary_Edge\n\
+s_waitcnt 0\n\
+//v_mov_b32 v11 "+GSUxWaveNum+"\n\
+//v_mov_b32 v10, s[sgprGSUSync]\n\
+//V_CMP_GE_U32 vcc, v10, v11\n\
+//s_cbranch_vccz "+str(labelendname)+"\n\
+//s_mov_b32 s[sgprGSUSync], 0x10000000\n\
+//s_cmp_eq_u32 s[sgprGSUSync], 0               // s[sgprGSUSync] == GSU*WaveNum-1 ?\n\
+//s_cbranch_scc0 "+str(labelendname)+" //label_GW_End_1 //label_AFTERsummary_Edge\n\
 //synchronizer check\n\
 \n\
 //synchronizer\n\
@@ -987,6 +1007,18 @@ buffer_store_dwordx4 v["+str(vgprstart)+":"+str(vgprstart)+"+3], "+str(vgproffse
     else:
         contents = \
         "\n\
+\n\
+\n\
+\n\
+v_mov_b32 v["+str(vgprstart)+"+0], s[sgprGSUSync]\n\
+v_mov_b32 v["+str(vgprstart)+"+1], s[sgprGSUSync]\n\
+v_mov_b32 v["+str(vgprstart)+"+2], s[sgprGSUSync]\n\
+v_mov_b32 v["+str(vgprstart)+"+3], s[sgprGSUSync]\n\
+V_CVT_F32_U32 v["+str(vgprstart)+"+0], v["+str(vgprstart)+"+0]\n\
+V_CVT_F32_U32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+1]\n\
+V_CVT_F32_U32 v["+str(vgprstart)+"+2], v["+str(vgprstart)+"+2]\n\
+V_CVT_F32_U32 v["+str(vgprstart)+"+3], v["+str(vgprstart)+"+3]\n\
+\n\
 v_cvt_f16_f32 v["+str(vgprstart)+"+0], v["+str(vgprstart)+"+0]\n\
 v_cvt_f16_f32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+1]\n\
 v_cvt_f16_f32 v["+str(vgprstart)+"+2], v["+str(vgprstart)+"+2]\n\
@@ -1121,7 +1153,8 @@ buffer_store_dwordx2 v["+str(vgprstart)+":"+str(vgprstart)+"+1], "+str(vgproffse
         if self.kernel["ProblemType"]["UseScaleDVec"]:
           waitLoadCnt += self.scaleDVecLoadIssued[elementIdx]
           waitLoadCntStrList.append("%d (scaleDVec)"%self.scaleDVecLoadIssued[elementIdx])
-        if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+        # if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
+        if self.kernel["ProblemType"]["UseScaleAlphaVec"]:
           waitLoadCnt += self.scaleAlphaVecLoadIssued[elementIdx]
           waitLoadCntStrList.append("%d (scaleAlphaVec)"%self.scaleAlphaVecLoadIssued[elementIdx])
         # Calculate local loads
@@ -1165,10 +1198,10 @@ buffer_store_dwordx2 v["+str(vgprstart)+":"+str(vgprstart)+"+1], "+str(vgproffse
               tmp += " - %s"%cntStr
             comment = comment + (" " if comment else "") + "lgkmcnt(%d) = %d%s"%(lgkmcnt, self.localLoadsBiasIssued, tmp)
           module.addSpaceLine()
-          if 0:
+          if 1:
             module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="%s (interleaved)"%comment))
-        else:
-          module.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="%d(interleaved%dVictor)%d"%(lgkmcnt, vmcnt, vscnt)))
+        # else:
+        #   module.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="%d(interleaved%dVictor)%d"%(lgkmcnt, vmcnt, vscnt)))
 
       scaleAlphaVecModule = Module("scaleAlphaVecModule")
       # if self.kernel["ProblemType"]["UseScaleAlphaVec"] and (self.kernel["GlobalSplitU"] == 1):
@@ -1284,7 +1317,7 @@ buffer_store_dwordx2 v["+str(vgprstart)+":"+str(vgprstart)+"+1], "+str(vgproffse
       gradientInput = dataE if self.kernel["ProblemType"]["Gradient"] and (self.kernel["GlobalSplitU"] == 1) else self.ss.elementSumIdx[elementIdx]
       if self.kernel["ActivationFuncCall"]:
         if (activationCDataType == self.kernel["ProblemType"]["DestDataType"]) and \
-          (activationCDataType != self.kernel["ProblemType"]["ComputeDataType"]) and (self.kernel["ProblemType"]["UseScaleDVec"] == False) and (self.kernel["ProblemType"]["UseScaleAlphaVec"] == False):
+          (activationCDataType != self.kernel["ProblemType"]["ComputeDataType"]) and ((self.kernel["ProblemType"]["UseScaleDVec"] == False) or (self.kernel["ProblemType"]["UseScaleAlphaVec"] == False)):
           isActivationInsertAfter = True
         activationModule = Module("ActivationFuncCall")
         if (not mergeActFuncCall) and (not isActivationInsertAfter):
@@ -1294,7 +1327,7 @@ buffer_store_dwordx2 v["+str(vgprstart)+":"+str(vgprstart)+"+1], "+str(vgproffse
           src=sgpr(self.activationSetPCStruct.sgprOffsetActivation, 2)))
         activationModule.appendModule (copyData(activationCDataType, gradientInput, self.gwvw, \
           self.activationSetPCStruct.vgprActCopy, 1))
-      elif self.parentWriter.insertActivationAfterPacked(self.kernel, self.activationTypeStr) and (self.kernel["ProblemType"]["UseScaleDVec"] == False) and (self.kernel["ProblemType"]["UseScaleAlphaVec"] == False):
+      elif self.parentWriter.insertActivationAfterPacked(self.kernel, self.activationTypeStr) and ((self.kernel["ProblemType"]["UseScaleDVec"] == False) or (self.kernel["ProblemType"]["UseScaleAlphaVec"] == False)):
         isActivationInsertAfter = True
         activationModule = self.parentWriter.getActivationDestDataType(self.kernel, self.activation, \
           self.activationTypeStr, self.gwvw, gradientInput , gradientInput, self.tmpVgpr, self.tmpSgpr)
