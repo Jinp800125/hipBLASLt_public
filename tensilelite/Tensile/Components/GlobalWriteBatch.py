@@ -265,8 +265,9 @@ s_mov_b32 s[sgprSrdDd+3], Srd127_96                               // \n\
 s_add_u32 s[sgprSrdDd+0], s[sgprAddressD+0], s[sgprtmp0E]        // add lo GSU offset to SRD\n\
 s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp1E]       // add hi GSU offset to SRD\n\
 \n\
+//s[sgprWorkGroup0], s[sgprWorkGroup1]\n\
 s_mov_b32 s[sgprtmp0E], s[sgprGSUSumIdx]                          //cal synchronizer position\n\
-s_lshl_b32 s[sgprtmp0E], s[sgprtmp0E], 2\n\
+//s_lshl_b32 s[sgprtmp0E], s[sgprtmp0E], 2\n\
 \n\
 s_add_u32 s[sgprSrdDd+0], s[sgprSrdDd+0], s[sgprtmp0E]            // add lo to SRD\n\
 s_addc_u32 s[sgprSrdDd+1], s[sgprSrdDd+1], 0                      // add hi to SRD\n\
@@ -291,14 +292,15 @@ s_lshl_b64 s[sgprtmp0E:sgprtmp1E], s[sgprtmp0E:sgprtmp1E], 2          // scale b
 s_add_u32 s[sgprSrdD+0], s[sgprSrdD+0], s[sgprtmp0E]                  // add lo to SRD\n\
 s_addc_u32 s[sgprSrdD+1], s[sgprSrdD+1], s[sgprtmp1E]                 // add hi to SRD\n\
 \n\
+s_barrier\n\
 s_waitcnt 0\n\
 //v_mov_b32 v11 "+GSUxWaveNum+"\n\
 //v_mov_b32 v10, s[sgprGSUSync]\n\
 //V_CMP_GE_U32 vcc, v10, v11\n\
 //s_cbranch_vccz "+str(labelendname)+"\n\
 //s_mov_b32 s[sgprGSUSync], 0x10000000\n\
-//s_cmp_eq_u32 s[sgprGSUSync], 0               // s[sgprGSUSync] == GSU*WaveNum-1 ?\n\
-//s_cbranch_scc0 "+str(labelendname)+" //label_GW_End_1 //label_AFTERsummary_Edge\n\
+s_cmp_ge_u32 s[sgprGSUSync], 3               // s[sgprGSUSync] == GSU*WaveNum-1 ?\n\
+s_cbranch_scc0 "+str(labelendname)+" //label_GW_End_1 //label_AFTERsummary_Edge\n\
 //synchronizer check\n\
 \n\
 //synchronizer\n\
@@ -312,7 +314,7 @@ s_sub_u32 s[sgprtmp5E], s[sgprSizesFree+1], 1                       // cal GSU D
 //s_mul_i32 s[sgprtmp5E], s[sgprtmp5E], s[sgprGSUSumIdx]            // \n\
 s_mul_hi_u32 s[sgprtmp3E], s[sgprtmp5E], s[sgprStrideC1J]           // \n\
 s_mul_i32 s[sgprtmp2E], s[sgprtmp5E], s[sgprStrideC1J]              // \n\
-s_add_u32 s[sgprtmp0E], s[sgprSizesFree+0], s[sgprtmp2E]            // \n\
+s_add_u32 s[sgprtmp0E], s[sgprtmp0E], s[sgprtmp2E]            // \n\
 s_addc_u32 s[sgprtmp1E], 0, s[sgprtmp3E]                            // \n\
 s_sub_u32 s[sgprtmp5E], s[sgprSizesFree+2], 1                       // \n\
 //s_mul_i32 s[sgprtmp5E], s[sgprtmp5E], s[sgprGSUSumIdx]            // \n\
@@ -1010,9 +1012,10 @@ buffer_store_dwordx4 v["+str(vgprstart)+":"+str(vgprstart)+"+3], "+str(vgproffse
 \n\
 \n\
 \n\
-v_mov_b32 v["+str(vgprstart)+"+0], s[sgprGSUSync]\n\
-v_mov_b32 v["+str(vgprstart)+"+1], s[sgprGSUSync]\n\
-v_mov_b32 v["+str(vgprstart)+"+2], s[sgprGSUSync]\n\
+s_mul_i32 s[sgprtmp2E], s[sgprNumWorkGroups0], s[sgprNumWorkGroups1]\n\
+v_mov_b32 v["+str(vgprstart)+"+0], s[sgprGSUSumIdx]\n\
+v_mov_b32 v["+str(vgprstart)+"+1], s[sgprGSUSumIdx]\n\
+v_mov_b32 v["+str(vgprstart)+"+2], s[sgprtmp2E]\n\
 v_mov_b32 v["+str(vgprstart)+"+3], s[sgprGSUSync]\n\
 V_CVT_F32_U32 v["+str(vgprstart)+"+0], v["+str(vgprstart)+"+0]\n\
 V_CVT_F32_U32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+1]\n\
