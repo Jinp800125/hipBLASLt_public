@@ -1132,7 +1132,7 @@ class Solution(collections.abc.Mapping):
     if (((self["GlobalSplitU"] > 1) and (not self["_GlobalAccumulation"])) or (self["ActivationFused"] == False)) \
       and (self["ProblemType"]["ActivationType"] != 'none') :
     # if (((not self["_GlobalAccumulation"])) or (self["ActivationFused"] == False)) \
-      # and (self["ProblemType"]["ActivationType"] != 'none') :
+    #   and (self["ProblemType"]["ActivationType"] != 'none') :
       state = {}
       state["ProblemType"] = deepcopy(self["ProblemType"])
       state["ProblemType"]["UseBias"] = False

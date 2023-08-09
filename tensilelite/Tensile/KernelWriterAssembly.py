@@ -4045,6 +4045,11 @@ class KernelWriterAssembly(KernelWriter):
           loadedArgs += 2
         structAddressOffset += (2 * self.states.bpr)
         self.externalArgLoader.setOffset(extArgOffset + structAddressOffset)
+        if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+          loadModuleExt.addModuleAsFlatItems(module.addModuleAsFlatItems(self.externalArgLoader.loadAllKernArg(self.sgprs["LoadStoreSgprs"] + loadedArgs, "ExternalArgAddress", 2)))
+          loadedArgs += 2
+        structAddressOffset += (2 * self.states.bpr)
+        self.externalArgLoader.setOffset(extArgOffset + structAddressOffset)
         biasLoadSize = self.states.numSgprAddressBias + self.states.BiasType + self.states.BiasStride
         if self.states.numSgprAddressBias:
           loadModuleExt.addModuleAsFlatItems(module.addModuleAsFlatItems(self.externalArgLoader.loadAllKernArg(self.sgprs["LoadStoreSgprs"] + loadedArgs, "ExternalArgAddress", biasLoadSize)))

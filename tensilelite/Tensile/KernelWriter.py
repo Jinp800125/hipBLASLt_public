@@ -1886,18 +1886,34 @@ s_cbranch_scc0 label_ZEROINGEND           // \n\
 s_cmp_eq_u32 s[sgprGSUSumIdx], 0          // \n\
 s_cbranch_scc0 label_ZEROINGEND           // jump if not\n\
 \n\
-s_mul_hi_u32 s[sgprtmp3E], s[sgprStrideCK], "+str(GSU)+"            // cal zeroing start position\n\
-s_mul_i32 s[sgprtmp2E], s[sgprStrideCK], "+str(GSU)+"               //\n\
-s_lshl_b64 s[sgprtmp2E:sgprtmp2E+1], s[sgprtmp2E:sgprtmp2E+1], 2    // scale by bpe\n\
+// GSU Output Buffer offset: Free0 + (Free1-1)*StrideC1J + (Free2-1)*StrideCK * GSUIdx * bpe%s\n\
+s_mul_hi_u32 s[sgprtmp1E], s[sgprSizesFree+0], "+str(GSU)+" // Free0\n\
+s_mul_i32 s[sgprtmp0E], s[sgprSizesFree+0], "+str(GSU)+" // Free0\n\
+s_sub_u32 s[sgprtmp4E], s[sgprSizesFree+1], 1               // Free1\n\
+s_mul_i32 s[sgprtmp4E], s[sgprtmp4E], "+str(GSU)+"               // Free1\n\
+s_mul_hi_u32 s[sgprtmp3E], s[sgprtmp4E], s[sgprStrideC1J]            // Free1\n\
+s_mul_i32 s[sgprtmp2E], s[sgprtmp4E], s[sgprStrideC1J]               // Free1\n\
+s_add_u32 s[sgprtmp0E], s[sgprtmp0E], s[sgprtmp2E]                            // Free1\n\
+s_addc_u32 s[sgprtmp1E], s[sgprtmp1E], s[sgprtmp3E]                           // Free1\n\
+s_sub_u32 s[sgprtmp4E], s[sgprSizesFree+2], 1               // Free2\n\
+s_mul_i32 s[sgprtmp4E], s[sgprtmp4E], "+str(GSU)+"               // Free2\n\
+s_mul_hi_u32 s[sgprtmp3E], s[sgprtmp4E], s[sgprStrideCK]             // Free2\n\
+s_mul_i32 s[sgprtmp2E], s[sgprtmp4E], s[sgprStrideCK]                // Free2\n\
+s_add_u32 s[sgprtmp0E], s[sgprtmp0E], s[sgprtmp2E]                            // Free2\n\
+s_addc_u32 s[sgprtmp1E], s[sgprtmp1E], s[sgprtmp3E]                           // Free2\n\
+s_lshl_b64 s[sgprtmp0E:sgprtmp1E], s[sgprtmp0E:sgprtmp1E], 2                   // scale by bpe\n\
 \n\
 s_mov_b32 s[sgprSrdDd+2], 0x80000000\n\
 s_mov_b32 s[sgprSrdDd+3], Srd127_96\n\
 \n\
-s_add_u32 s[sgprSrdDd+0], s[sgprAddressD+0], s[sgprtmp2E]    // add lo to SRD\n\
-s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp3E]   // add hi to SRD\n"
+s_add_u32 s[sgprSrdDd+0], s[sgprAddressD+0], s[sgprtmp0E]    // add lo to SRD\n\
+s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp1E]   // add hi to SRD\n"
+
     module.addGSUSYNC(contents)
 
-    r, mod = divmod(GSU, 4)
+    sizeVictor = 4 #4x(sizeI/MT0)x(sizeJ/MT1)
+    r, mod = divmod(sizeVictor, 4)
+    #r, mod = divmod(GSU, 4)
     print("sdgdfpghk[rk[pkdhkdf[gpldp]]]")
     print(GSU)
     print(r)

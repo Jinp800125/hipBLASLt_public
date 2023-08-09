@@ -671,6 +671,18 @@ namespace
             tensileProblem.setUseE(false);
             tensileProblem.setUseGradient(false);
         }
+        else if(fallback && prob.scaleAlphaVec != nullptr && prob.E == nullptr
+        // if(fallback && prob.bias == nullptr && prob.scaleAlphaVec == nullptr && prob.E == nullptr
+           && tensileAct == Tensile::ActivationType::None)
+        {
+            tensileProblem.setUseBias(true);
+            tensileProblem.setActivationType(Tensile::ActivationType::All);
+            tensileProblem.setUseScaleDVec(true);
+            tensileProblem.setUseScaleAlphaVec(true);
+            std::cout << "Victor26" << std::endl;
+            tensileProblem.setUseE(false);
+            tensileProblem.setUseGradient(false);
+        }
         else
         {
             auto& d = tensileProblem.tensor(Tensile::ContractionProblemGemm::TENSOR::D);
@@ -1961,6 +1973,32 @@ inline auto getSolutions(
         tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
         tensile_prob.setUseE(useE);
         std::cout << "Victor95" << std::endl;
+    }
+
+    if(scaleAlphaVec != nullptr && E == nullptr
+    // if(scaleAlphaVec == nullptr && bias == nullptr && E == nullptr
+       && tensile_prob.activationEnumArg() == Tensile::ActivationType::None)
+    {
+        auto useBias      = tensile_prob.useBias();
+        auto actType      = tensile_prob.activationType();
+        auto useScaleDVec = tensile_prob.useScaleDVec();
+        auto useScaleAlphaVec = tensile_prob.useScaleAlphaVec();
+        auto useE         = tensile_prob.useE();
+        tensile_prob.setUseBias(true);
+        tensile_prob.setActivationType(Tensile::ActivationType::All);
+        tensile_prob.setUseScaleDVec(true);
+        tensile_prob.setUseScaleAlphaVec(true);
+        tensile_prob.setUseE(false);
+        std::cout << "Victor86" << std::endl;
+        solutions_fallback = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
+        std::cout << "solutions_fallback.size(): " << solutions_fallback.size() << std::endl;
+        // restore
+        tensile_prob.setUseBias(useBias);
+        tensile_prob.setActivationType(actType);
+        tensile_prob.setUseScaleDVec(useScaleDVec);
+        tensile_prob.setUseScaleAlphaVec(useScaleAlphaVec);
+        tensile_prob.setUseE(useE);
+        std::cout << "Victor96" << std::endl;
     }
     auto solutions = library->findTopSolutions(tensile_prob, *hardware, requestedAlgoCount);
     std::cout << "solutions.size(): " << solutions.size() << std::endl;

@@ -266,7 +266,9 @@ s_add_u32 s[sgprSrdDd+0], s[sgprAddressD+0], s[sgprtmp0E]        // add lo GSU o
 s_addc_u32 s[sgprSrdDd+1], s[sgprAddressD+1], s[sgprtmp1E]       // add hi GSU offset to SRD\n\
 \n\
 //s[sgprWorkGroup0], s[sgprWorkGroup1]\n\
-s_mov_b32 s[sgprtmp0E], s[sgprGSUSumIdx]                          //cal synchronizer position\n\
+//s_mov_b32 s[sgprtmp0E], s[sgprGSUSumIdx]                          //cal synchronizer position\n\
+s_mul_i32 s[sgprtmp0E], s[sgprNumWorkGroups0], s[sgprWorkGroup1]\n\
+s_add_u32 s[sgprtmp0E], s[sgprWorkGroup0], s[sgprtmp0E]\n\
 //s_lshl_b32 s[sgprtmp0E], s[sgprtmp0E], 2\n\
 \n\
 s_add_u32 s[sgprSrdDd+0], s[sgprSrdDd+0], s[sgprtmp0E]            // add lo to SRD\n\
@@ -299,7 +301,7 @@ s_waitcnt 0\n\
 //V_CMP_GE_U32 vcc, v10, v11\n\
 //s_cbranch_vccz "+str(labelendname)+"\n\
 //s_mov_b32 s[sgprGSUSync], 0x10000000\n\
-s_cmp_ge_u32 s[sgprGSUSync], 3               // s[sgprGSUSync] == GSU*WaveNum-1 ?\n\
+s_cmp_ge_u32 s[sgprGSUSync], 20               // s[sgprGSUSync] == GSU*WaveNum-1 ?\n\
 s_cbranch_scc0 "+str(labelendname)+" //label_GW_End_1 //label_AFTERsummary_Edge\n\
 //synchronizer check\n\
 \n\
@@ -1013,9 +1015,9 @@ buffer_store_dwordx4 v["+str(vgprstart)+":"+str(vgprstart)+"+3], "+str(vgproffse
 \n\
 \n\
 s_mul_i32 s[sgprtmp2E], s[sgprNumWorkGroups0], s[sgprNumWorkGroups1]\n\
-v_mov_b32 v["+str(vgprstart)+"+0], s[sgprGSUSumIdx]\n\
-v_mov_b32 v["+str(vgprstart)+"+1], s[sgprGSUSumIdx]\n\
-v_mov_b32 v["+str(vgprstart)+"+2], s[sgprtmp2E]\n\
+v_mov_b32 v["+str(vgprstart)+"+0], s[sgprWorkGroup0]\n\
+v_mov_b32 v["+str(vgprstart)+"+1], s[sgprWorkGroup1]\n\
+v_mov_b32 v["+str(vgprstart)+"+2], s[sgprGSUSumIdx]\n\
 v_mov_b32 v["+str(vgprstart)+"+3], s[sgprGSUSync]\n\
 V_CVT_F32_U32 v["+str(vgprstart)+"+0], v["+str(vgprstart)+"+0]\n\
 V_CVT_F32_U32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+1]\n\
