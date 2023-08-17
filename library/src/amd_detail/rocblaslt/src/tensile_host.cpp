@@ -789,6 +789,8 @@ namespace
         // Set the GSU workspace
         inputs.ws = prob.workspace;
 
+        inputs.GSUSynczero = prob.GSUSynczero;
+
         // set bias vector
         inputs.bias          = reinterpret_cast<const void*>(prob.bias);
         inputs.scaleA        = reinterpret_cast<const void*>(prob.scaleA);
@@ -1225,6 +1227,7 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                         
         int* solutionIndex = (int*)algo->data;
         data->algoIndex    = *solutionIndex;
 
+        // std::cout << "GSUSynczero" << handle->GSUSynczero << std::endl;
         auto solution = library->getSolutionByIndex(data->problem, *hardware, *solutionIndex);
         if(!solution)
         {

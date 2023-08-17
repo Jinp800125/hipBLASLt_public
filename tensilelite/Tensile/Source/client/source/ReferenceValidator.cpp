@@ -366,6 +366,12 @@ namespace Tensile
                     refPtr = reference.scaleAlphaVec;
                     resPtr = result.scaleAlphaVec;
                 }
+                case ContractionProblemGemm::TENSOR::GSUSynczero:
+                {
+                    refPtr = reference.GSUSynczero;
+                    resPtr = result.GSUSynczero;
+                }
+
                 break;
                 default:
                     throw std::runtime_error("Unrecognized output tensor.");

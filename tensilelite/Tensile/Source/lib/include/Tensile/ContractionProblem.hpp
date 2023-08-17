@@ -175,6 +175,7 @@ namespace Tensile
             SCALED        = 9,
             SCALEALPHAVEC = 10,
             METADATA      = 11,
+            GSUSynczero      = 12,
             TENSOR_COUNT
         };
 
@@ -674,6 +675,16 @@ namespace Tensile
             }
         }
 
+        void setGSUSynczero(DataType type, size_t length)
+        {
+            // m_scaleAlphaVecType = type;
+            if(type != DataType::None && 1)
+            {
+                m_tensors[ContractionProblemGemm::TENSOR::GSUSynczero]
+                    = {"GSUSynczero", type, {length}, {1, length}};
+            }
+        }
+
         void setBetaRestriction(ScalarValue beta)
         {
             m_betaRestriction = beta;
@@ -1109,6 +1120,7 @@ namespace Tensile
                           void const*          _scaleD,
                           void const*          _scaleAlphaVec,
                           void*                _ws,
+                          void*                _GSUSynczero,
                           unsigned char const* _metadata);
 
         // TODO: Remove this
@@ -1138,6 +1150,7 @@ namespace Tensile
 
         // Workspace
         void*                ws       = nullptr;
+        void*                GSUSynczero       = nullptr;
         unsigned char const* metadata = nullptr;
 
         std::vector<size_t> maxElements;

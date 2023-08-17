@@ -1154,6 +1154,10 @@ class Solution(collections.abc.Mapping):
       state["KernelLanguage"] = "Source"
       state["_GlobalAccumulation"] = self["_GlobalAccumulation"]
       state["ActivationFused"] = self["ActivationFused"]
+      print("GlobalSplitU", self["GlobalSplitU"])
+      print("_GlobalAccumulation", self["_GlobalAccumulation"])
+      print("ActivationFused", self["ActivationFused"])
+      print("ActivationType", self["ProblemType"]["ActivationType"])
       self.activationOnlyKernelObjects.append(KernelWriterActivationOnly(state))
 
   def initReductionKernelObjects(self):
@@ -1189,7 +1193,6 @@ class Solution(collections.abc.Mapping):
   def getMIOutputInfo(state):
     outputVectorWidth = 4
     RegsPerOut = 1
-
     isa = tuple(state["ISA"])
     if globalParameters["AsmCaps"][isa]['HasMFMA']:
       if state["ProblemType"]["DataType"].MIOutputTypeNameAbbrev() == 'f64':
@@ -1854,10 +1857,12 @@ class Solution(collections.abc.Mapping):
             state["_GlobalAccumulation"] = 'SingleBuffer'
         elif state["GlobalSplitUAlgorithm"] == 'MultipleBuffer':
           state["_GlobalAccumulation"] = 'MultipleBuffer'
+        elif state["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel':
+          state["_GlobalAccumulation"] = 'MultipleBufferSingleKernel'
 
         if state["_GlobalAccumulation"] == 'SingleBuffer':
           state["_WorkspaceSizePerElemC"] = computeBytes
-        elif state["_GlobalAccumulation"] == 'MultipleBuffer':
+        elif state["_GlobalAccumulation"] == 'MultipleBuffer' or state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
           state["_WorkspaceSizePerElemC"] = computeBytes * state["GlobalSplitU"]
 
     if("_WorkspaceSizePerElemBias" not in state):
@@ -1869,7 +1874,7 @@ class Solution(collections.abc.Mapping):
         elif state["GlobalSplitU"] > 1:
           if state["_GlobalAccumulation"] == 'SingleBuffer':
             state["_WorkspaceSizePerElemBias"] = computeBytes
-          elif state["_GlobalAccumulation"] == 'MultipleBuffer':
+          elif state["_GlobalAccumulation"] == 'MultipleBuffer' or kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
             state["_WorkspaceSizePerElemBias"] = computeBytes * state["GlobalSplitU"]
 
     state["WorkspaceCheck"] = [state["_WorkspaceSizePerElemC"], state["_WorkspaceSizePerElemBias"]]
@@ -2157,10 +2162,10 @@ class Solution(collections.abc.Mapping):
     # TT0,1 both must be multiples of VW, b/c of rC, rA, rB
     if state["EnableMatrixInstruction"]:
       if (state["MIWaveTile"][0] % state["VectorWidthA"]) != 0:
-        reject(state, "MIWaveTile0(%u) should be multiple of VectorWidth(%u)" % (state["MIWaveTile"][0], state["VectorWidthA"]))
+        reject(state, "MIWaveTile0(%u) should be multiple of VectorWidthA(%u)" % (state["MIWaveTile"][0], state["VectorWidthA"]))
         return
       if (state["MIWaveTile"][1] % state["VectorWidthB"]) != 0:
-        reject(state, "MIWaveTile0(%u) should be multiple of VectorWidth(%u)" % (state["MIWaveTile"][0], state["VectorWidthB"]))
+        reject(state, "MIWaveTile0(%u) should be multiple of VectorWidthB(%u)" % (state["MIWaveTile"][1], state["VectorWidthB"]))
         return
 
     if len(problemType["IndicesSummation"]) > 1:
@@ -3226,7 +3231,7 @@ class Solution(collections.abc.Mapping):
 
     # Activation
     # Function call is set to false if GSU != 1 or Activation is not fused or ActivationType is not All.
-    if not ((state["GlobalSplitU"] == 1) and state["ActivationFused"] and state["ProblemType"]["ActivationType"] == 'all') \
+    if not ((state["GlobalSplitU"] == 1 or (state["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel')) and state["ActivationFused"] and state["ProblemType"]["ActivationType"] == 'all') \
       and state["ActivationFuncCall"]:
       state["ActivationFuncCall"] = False
 
@@ -3263,6 +3268,17 @@ class Solution(collections.abc.Mapping):
     if state["GlobalSplitU"] > 1:
       if state["ProblemType"]["SupportUserArgs"]:
         reject(state, "Currently SupportUserArgs does not support GSU > 1.")
+
+    if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+      print(state["MatrixInstruction"])
+      # if state["MatrixInstruction"] != [16, 16, 16, 1] and state["MatrixInstruction"] != [16, 16, 4, 1]:
+      #   reject(state, "Victor reject MatrixInstruction.")
+      if state["StoreRemapVectorWidth"]:
+        reject(state, "Victor reject StoreRemapVectorWidth.")
+      # if state["SourceSwap"]:
+      #   reject(state, "Victor reject SourceSwap.")
+      if state["StoreVectorWidth"] != 4:
+        reject(state, "Victor reject StoreVectorWidth.")
 
   ########################################
   # create a dictionary with booleans on whether to include parameter in name
@@ -3328,7 +3344,8 @@ class Solution(collections.abc.Mapping):
   @ staticmethod
   def getKeyNoInternalArgs(state):
     state_copy = deepcopy(state)
-    state_copy["GlobalSplitU"] = "M" if state_copy["GlobalSplitU"] > 1 else state_copy["GlobalSplitU"]
+    state_copy["GlobalSplitU"] = "M" if (state_copy["GlobalSplitU"] > 1 and state["GlobalSplitUAlgorithm"] != 'MultipleBufferSingleKernel') else state_copy["GlobalSplitU"]
+    # print("getKeyNoInternalArgs")
     return state_copy
 
   @ staticmethod
@@ -3347,6 +3364,7 @@ class Solution(collections.abc.Mapping):
   # Get Name Min
   @ staticmethod
   def getNameMin(state, requiredParameters, ignoreInternalArgs = False):
+    # print("getNameMin")
     if isCustomKernelConfig(state):
       return state["CustomKernelName"]
 
@@ -3367,7 +3385,7 @@ class Solution(collections.abc.Mapping):
     backup = state["GlobalSplitU"]
 
     if ignoreInternalArgs:
-      state["GlobalSplitU"] = "M" if state["GlobalSplitU"] > 1 else state["GlobalSplitU"]
+      state["GlobalSplitU"] = "M" if (state["GlobalSplitU"] > 1 and state["GlobalSplitUAlgorithm"] != 'MultipleBufferSingleKernel') else state["GlobalSplitU"]
 
     components.append('SN')
     for key in sorted(state.keys()):

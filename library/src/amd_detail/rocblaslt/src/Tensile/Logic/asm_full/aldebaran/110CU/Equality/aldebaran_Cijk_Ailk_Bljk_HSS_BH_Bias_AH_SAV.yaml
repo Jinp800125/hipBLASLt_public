@@ -3346,9 +3346,9 @@
     BufferStore: true
     ClusterLocalRead: 1
     CodeObjectVersion: V3
-    # CustomKernelName: ''
+    CustomKernelName: ''
     BatchSizeEqual: 1
-    CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVWA4_GRVWB4_GSU9_K1_LBSPPA0_LPA0_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG64_4_1_WGM8'
+    # CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVWA4_GRVWB4_GSU9_K1_LBSPPA0_LPA0_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG64_4_1_WGM8'
     DepthU: 64
     DepthULdsDivisor: 1
     DirectToLds: false
@@ -3363,7 +3363,7 @@
     GlobalReadVectorWidthA: 4
     GlobalReadPerMfma: 1
     GlobalSplitU: 9
-    GlobalSplitUAlgorithm: MultipleBuffer
+    GlobalSplitUAlgorithm: MultipleBufferSingleKernel
     GlobalWriteVectorWidth: 4
     GroupLoadStore: false
     GuaranteeNoPartialA: true
@@ -3548,7 +3548,7 @@
     WorkGroup: [64, 4, 1]
     WorkGroupMapping: 8
     _DepthULds: 64
-    _GlobalAccumulation: MultipleBuffer
+    _GlobalAccumulation: MultipleBufferSingleKernel
     _UseSgprForGRO: 1
     _VectorStore: 1
     _WorkspaceSizePerElemBias: 0
@@ -3567,9 +3567,9 @@
     BufferStore: true
     ClusterLocalRead: 1
     CodeObjectVersion: V3
-    # CustomKernelName: ''
+    CustomKernelName: ''
     BatchSizeEqual: 1
-    CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVWA2_GRVWB4_GSU9_K1_LBSPPA0_LPA0_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG64_4_1_WGM15'
+    # CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVWA2_GRVWB4_GSU9_K1_LBSPPA0_LPA0_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG64_4_1_WGM15'
     DepthU: 64
     DepthULdsDivisor: 1
     DirectToLds: false
@@ -3584,7 +3584,7 @@
     GlobalReadVectorWidthA: 2
     GlobalReadPerMfma: 1
     GlobalSplitU: 9
-    GlobalSplitUAlgorithm: MultipleBuffer
+    GlobalSplitUAlgorithm: MultipleBufferSingleKernel
     GlobalWriteVectorWidth: 4
     GroupLoadStore: false
     GuaranteeNoPartialA: true
@@ -3769,7 +3769,7 @@
     WorkGroup: [64, 4, 1]
     WorkGroupMapping: 15
     _DepthULds: 64
-    _GlobalAccumulation: MultipleBuffer
+    _GlobalAccumulation: MultipleBufferSingleKernel
     _UseSgprForGRO: 1
     _VectorStore: 1
     _WorkspaceSizePerElemBias: 0
@@ -3789,9 +3789,9 @@
     BufferStore: true
     ClusterLocalRead: 1
     CodeObjectVersion: V3
-    # CustomKernelName: ''
+    CustomKernelName: ''
     BatchSizeEqual: 1
-    CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT16x32x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU5_K1_LBSPPA128_LPA16_LPB8_LRVW4_MIWT1_1_NTA0_NTB3_NEPBS0_SU0_SUS0_WG16_8_1_WGM0'
+    # CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT16x32x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU5_K1_LBSPPA128_LPA16_LPB8_LRVW4_MIWT1_1_NTA0_NTB3_NEPBS0_SU0_SUS0_WG16_8_1_WGM0'
     DepthU: 64
     DepthULdsDivisor: 1
     DirectToLds: false
@@ -3806,7 +3806,7 @@
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 5
-    GlobalSplitUAlgorithm: MultipleBuffer
+    GlobalSplitUAlgorithm: MultipleBufferSingleKernel
     GlobalWriteVectorWidth: 1
     GroupLoadStore: false
     GuaranteeNoPartialA: true
@@ -3998,7 +3998,7 @@
     WorkGroupReduction: false
     WorkspaceCheck: [20, 0]
     _DepthULds: 64
-    _GlobalAccumulation: MultipleBuffer
+    _GlobalAccumulation: MultipleBufferSingleKernel
     _UseSgprForGRO: 1
     _VectorStore: 1
     _WorkspaceSizePerElemBias: 0
@@ -4018,9 +4018,9 @@
     BufferStore: true
     ClusterLocalRead: 1
     CodeObjectVersion: V3
-    # CustomKernelName: ''
+    CustomKernelName: ''
     BatchSizeEqual: 1
-    CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT16x32x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU5_K1_LBSPPA128_LPA16_LPB8_LRVW4_MIWT1_1_NTA0_NTB3_NEPBS1_SU0_SUS0_WG16_8_1_WGM0'
+    # CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT16x32x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU5_K1_LBSPPA128_LPA16_LPB8_LRVW4_MIWT1_1_NTA0_NTB3_NEPBS1_SU0_SUS0_WG16_8_1_WGM0'
     DepthU: 64
     DepthULdsDivisor: 1
     DirectToLds: false
@@ -4035,7 +4035,7 @@
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 5
-    GlobalSplitUAlgorithm: MultipleBuffer
+    GlobalSplitUAlgorithm: MultipleBufferSingleKernel
     GlobalWriteVectorWidth: 1
     GroupLoadStore: false
     GuaranteeNoPartialA: true
@@ -4226,7 +4226,7 @@
     WorkGroupReduction: false
     WorkspaceCheck: [20, 0]
     _DepthULds: 64
-    _GlobalAccumulation: MultipleBuffer
+    _GlobalAccumulation: MultipleBufferSingleKernel
     _UseSgprForGRO: 1
     _VectorStore: 1
     _WorkspaceSizePerElemBias: 0
@@ -4245,9 +4245,9 @@
     BufferStore: true
     ClusterLocalRead: 1
     CodeObjectVersion: V3
-    # CustomKernelName: ''
+    CustomKernelName: ''
     BatchSizeEqual: 1
-    CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVWA2_GRVWB2_GSU6_K1_LBSPPA1024_LPA16_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG64_4_1_WGM1'
+    # CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT64x16x64_MI16x16x16x1_SN_GRVWA2_GRVWB2_GSU6_K1_LBSPPA1024_LPA16_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG64_4_1_WGM1'
     DepthU: 64
     DepthULdsDivisor: 1
     DirectToLds: false
@@ -4262,7 +4262,7 @@
     GlobalReadVectorWidthA: 2
     GlobalReadVectorWidthB: 2
     GlobalSplitU: 6
-    GlobalSplitUAlgorithm: MultipleBuffer
+    GlobalSplitUAlgorithm: MultipleBufferSingleKernel
     GlobalWriteVectorWidth: 2
     GroupLoadStore: false
     GuaranteeNoPartialA: true
@@ -4447,7 +4447,7 @@
     WorkGroup: [64, 4, 1]
     WorkGroupMapping: 1
     _DepthULds: 64
-    _GlobalAccumulation: MultipleBuffer
+    _GlobalAccumulation: MultipleBufferSingleKernel
     _UseSgprForGRO: 1
     _VectorStore: 1
     _WorkspaceSizePerElemBias: 0
@@ -4466,9 +4466,9 @@
     BufferStore: true
     ClusterLocalRead: 1
     CodeObjectVersion: V3
-    # CustomKernelName: ''
+    CustomKernelName: ''
     BatchSizeEqual: 1
-    CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT32x16x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU25_K1_LBSPPA512_LPA16_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG32_4_1_WGM8'
+    # CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT32x16x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU25_K1_LBSPPA512_LPA16_LPB16_LRVW8_MIWT1_1_NTA2_NTB0_NEPBS0_SU0_SUS0_WG32_4_1_WGM8'
     DepthU: 64
     DepthULdsDivisor: 1
     DirectToLds: false
@@ -4483,7 +4483,7 @@
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 25
-    GlobalSplitUAlgorithm: MultipleBuffer
+    GlobalSplitUAlgorithm: MultipleBufferSingleKernel
     GlobalWriteVectorWidth: 4
     GroupLoadStore: false
     GuaranteeNoPartialA: true
@@ -4668,7 +4668,7 @@
     WorkGroup: [32, 4, 1]
     WorkGroupMapping: 8
     _DepthULds: 64
-    _GlobalAccumulation: MultipleBuffer
+    _GlobalAccumulation: MultipleBufferSingleKernel
     _UseSgprForGRO: 1
     _VectorStore: 1
     _WorkspaceSizePerElemBias: 0
@@ -4687,9 +4687,9 @@
     BufferStore: true
     ClusterLocalRead: 1
     CodeObjectVersion: V3
-    # CustomKernelName: ''
+    CustomKernelName: ''
     BatchSizeEqual: 1
-    CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT16x16x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU25_K1_LBSPPA256_LPA16_LPB16_LRVW8_MIWT1_1_NTA2_NTB2_NEPBS0_SU0_SUS0_WG16_4_1_WGM1'
+    # CustomKernelName: 'Custom_Cijk_Ailk_Bljk_HSS_BH_Bias_AH_SAV_MT16x16x64_MI16x16x16x1_SN_GRVWA8_GRVWB8_GSU25_K1_LBSPPA256_LPA16_LPB16_LRVW8_MIWT1_1_NTA2_NTB2_NEPBS0_SU0_SUS0_WG16_4_1_WGM1'
     DepthU: 64
     DepthULdsDivisor: 1
     DirectToLds: false
@@ -4704,7 +4704,7 @@
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 25
-    GlobalSplitUAlgorithm: MultipleBuffer
+    GlobalSplitUAlgorithm: MultipleBufferSingleKernel
     GlobalWriteVectorWidth: 4
     GroupLoadStore: false
     GuaranteeNoPartialA: true
@@ -4889,7 +4889,7 @@
     WorkGroup: [16, 4, 1]
     WorkGroupMapping: 1
     _DepthULds: 64
-    _GlobalAccumulation: MultipleBuffer
+    _GlobalAccumulation: MultipleBufferSingleKernel
     _UseSgprForGRO: 1
     _VectorStore: 1
     _WorkspaceSizePerElemBias: 0

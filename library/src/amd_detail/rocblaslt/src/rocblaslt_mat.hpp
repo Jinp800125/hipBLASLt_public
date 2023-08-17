@@ -120,7 +120,7 @@ rocblaslt_status rocblaslt_batched_template(rocblaslt_handle             handle,
                                                           epilogue,
                                                           workspace,
                                                           workspaceSizeInBytes,
-                                                          stream};
+                                                          stream, handle->GSUSynczero};
     return runContractionProblem(handle, algo, problem, gemmData);
 }
 
@@ -210,7 +210,8 @@ rocblaslt_status rocblaslt_gemm_create_batched_template(hipblasOperation_t     t
                                                           epilogue,
                                                           nullptr,
                                                           0,
-                                                          0};
+                                                          0,
+                                                          nullptr};// GSUSynczero
     return gemmCreate(problem, gemmData, gemmCount);
 }
 
@@ -302,7 +303,8 @@ rocblaslt_status
                                                                          epilogue[i],
                                                                          nullptr,
                                                                          0,
-                                                                         0});
+                                                                         0,
+                                                                         nullptr});// GSUSynczero
     }
     return groupedGemmCreate(problems, gemmData, gemmCount);
 }

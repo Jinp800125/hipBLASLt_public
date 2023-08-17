@@ -48,7 +48,8 @@
  ******************************************************************************/
 template <typename TiA, typename TiB, typename To, typename Tc>
 RocblasltContractionProblem<TiA, TiB, To, Tc>
-    construct_rocblaslt_problem(const rocblaslt_matmul_desc matmul_descr,
+    construct_rocblaslt_problem(rocblaslt_handle        handle,
+                                const rocblaslt_matmul_desc matmul_descr,
                                 rocblaslt_matrix_layout     matA,
                                 rocblaslt_matrix_layout     matB,
                                 rocblaslt_matrix_layout     matC,
@@ -164,7 +165,8 @@ RocblasltContractionProblem<TiA, TiB, To, Tc>
                                                           epilogue,
                                                           nullptr,
                                                           maxWorkSpaceBytes,
-                                                          nullptr};
+                                                          nullptr,
+                                                          handle->GSUSynczero};// GSUSynczero
 
     return problem;
 }
@@ -1121,7 +1123,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     float* alphaf = (float*)alpha;
                     float* betaf  = (float*)beta;
                     auto   prob   = construct_rocblaslt_problem<float, float, float, float>(
-                        matmul_descr,
+                        handle, matmul_descr,
                         matA,
                         matB,
                         matC,
@@ -1145,7 +1147,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_half,
                                                             rocblaslt_half,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1168,7 +1170,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     float* betaf  = (float*)beta;
                     auto   prob
                         = construct_rocblaslt_problem<rocblaslt_half, rocblaslt_half, float, float>(
-                            matmul_descr,
+                            handle, matmul_descr,
                             matA,
                             matB,
                             matC,
@@ -1192,7 +1194,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_bfloat16,
                                                             rocblaslt_bfloat16,
                                                             rocblaslt_bfloat16,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1218,7 +1220,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     float* betaf  = (float*)beta;
                     auto   prob
                         = construct_rocblaslt_problem<rocblaslt_f8, rocblaslt_f8, float, float>(
-                            matmul_descr,
+                            handle, matmul_descr,
                             matA,
                             matB,
                             matC,
@@ -1239,7 +1241,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1262,7 +1264,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     float* betaf  = (float*)beta;
                     auto   prob
                         = construct_rocblaslt_problem<rocblaslt_f8, rocblaslt_bf8, float, float>(
-                            matmul_descr,
+                            handle, matmul_descr,
                             matA,
                             matB,
                             matC,
@@ -1283,7 +1285,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_bf8,
                                                             rocblaslt_half,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1307,7 +1309,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     float* betaf  = (float*)beta;
                     auto   prob
                         = construct_rocblaslt_problem<rocblaslt_bf8, rocblaslt_f8, float, float>(
-                            matmul_descr,
+                            handle, matmul_descr,
                             matA,
                             matB,
                             matC,
@@ -1328,7 +1330,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_bf8,
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1353,7 +1355,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto     prob   = construct_rocblaslt_problem<hipblasLtInt8,
                                                             hipblasLtInt8,
                                                             hipblasLtInt8,
-                                                            int32_t>(matmul_descr,
+                                                            int32_t>(handle, matmul_descr,
                                                                      matA,
                                                                      matB,
                                                                      matC,
@@ -1375,7 +1377,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto     prob   = construct_rocblaslt_problem<hipblasLtInt8,
                                                             hipblasLtInt8,
                                                             int32_t,
-                                                            int32_t>(matmul_descr,
+                                                            int32_t>(handle, matmul_descr,
                                                                      matA,
                                                                      matB,
                                                                      matC,
@@ -1399,7 +1401,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_f8,
                                                             rocblaslt_f8,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1421,7 +1423,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1443,7 +1445,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_f8,
                                                             float,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1468,7 +1470,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_half,
                                                             rocblaslt_f8,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1490,7 +1492,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_half,
                                                             rocblaslt_half,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1512,7 +1514,7 @@ rocblaslt_status rocblaslt_matmul_is_algo_supported(rocblaslt_handle        hand
                     auto   prob   = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_half,
                                                             float,
-                                                            float>(matmul_descr,
+                                                            float>(handle, matmul_descr,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1591,7 +1593,7 @@ rocblaslt_status
                     float alpha = 1.0;
                     float beta  = 1.0;
                     auto  prob  = construct_rocblaslt_problem<float, float, float, float>(
-                        matmul_desc,
+                        handle, matmul_desc,
                         matA,
                         matB,
                         matC,
@@ -1621,7 +1623,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_half,
                                                             rocblaslt_half,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1648,7 +1650,7 @@ rocblaslt_status
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_half, rocblaslt_half, float, float>(
-                            matmul_desc,
+                            handle, matmul_desc,
                             matA,
                             matB,
                             matC,
@@ -1678,7 +1680,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_bfloat16,
                                                             rocblaslt_bfloat16,
                                                             rocblaslt_bfloat16,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1709,7 +1711,7 @@ rocblaslt_status
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_f8, rocblaslt_f8, float, float>(
-                            matmul_desc,
+                            handle, matmul_desc,
                             matA,
                             matB,
                             matC,
@@ -1736,7 +1738,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1765,7 +1767,7 @@ rocblaslt_status
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_f8, rocblaslt_bf8, float, float>(
-                            matmul_desc,
+                            handle, matmul_desc,
                             matA,
                             matB,
                             matC,
@@ -1792,7 +1794,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_bf8,
                                                             rocblaslt_half,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1820,7 +1822,7 @@ rocblaslt_status
                     double alpha = 1.0;
                     double beta  = 1.0;
                     auto   prob  = construct_rocblaslt_problem<double, double, double, double>(
-                        matmul_desc,
+                        handle, matmul_desc,
                         matA,
                         matB,
                         matC,
@@ -1847,7 +1849,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_bf8,
                                                             rocblaslt_half,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1876,7 +1878,7 @@ rocblaslt_status
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_bf8, rocblaslt_f8, float, float>(
-                            matmul_desc,
+                            handle, matmul_desc,
                             matA,
                             matB,
                             matC,
@@ -1903,7 +1905,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_bf8,
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -1933,7 +1935,7 @@ rocblaslt_status
                     auto    prob  = construct_rocblaslt_problem<hipblasLtInt8,
                                                             hipblasLtInt8,
                                                             int32_t,
-                                                            int32_t>(matmul_desc,
+                                                            int32_t>(handle, matmul_desc,
                                                                      matA,
                                                                      matB,
                                                                      matC,
@@ -1960,7 +1962,7 @@ rocblaslt_status
                     auto    prob  = construct_rocblaslt_problem<hipblasLtInt8,
                                                             hipblasLtInt8,
                                                             hipblasLtInt8,
-                                                            int32_t>(matmul_desc,
+                                                            int32_t>(handle, matmul_desc,
                                                                      matA,
                                                                      matB,
                                                                      matC,
@@ -1990,7 +1992,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_f8,
                                                             rocblaslt_f8,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -2017,7 +2019,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -2044,7 +2046,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_half,
                                                             rocblaslt_f8,
                                                             float,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -2074,7 +2076,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_half,
                                                             rocblaslt_f8,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -2101,7 +2103,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_half,
                                                             rocblaslt_half,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -2128,7 +2130,7 @@ rocblaslt_status
                     auto  prob  = construct_rocblaslt_problem<rocblaslt_f8,
                                                             rocblaslt_half,
                                                             float,
-                                                            float>(matmul_desc,
+                                                            float>(handle, matmul_desc,
                                                                    matA,
                                                                    matB,
                                                                    matC,
@@ -2246,7 +2248,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                     float alpha = 1.0;
                     float beta  = 1.0;
                     auto  prob  = construct_rocblaslt_problem<float, float, float, float>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status = getAllSolutions<float, float, float, float>(
@@ -2279,7 +2281,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                                                             rocblaslt_half,
                                                             rocblaslt_half,
                                                             float>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status = getAllSolutions<rocblaslt_half,
@@ -2316,7 +2318,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_half, rocblaslt_half, float, float>(
-                            &matmul_desc,
+                            handle, &matmul_desc,
                             &matA,
                             &matB,
                             &matC,
@@ -2359,7 +2361,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                                                             rocblaslt_bfloat16,
                                                             rocblaslt_bfloat16,
                                                             float>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status = getAllSolutions<rocblaslt_bfloat16,
@@ -2399,7 +2401,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_f8, rocblaslt_f8, float, float>(
-                            &matmul_desc,
+                            handle, &matmul_desc,
                             &matA,
                             &matB,
                             &matC,
@@ -2437,7 +2439,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
                                                             float>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status = getAllSolutions<rocblaslt_f8, rocblaslt_f8, rocblaslt_half, float>(
@@ -2471,7 +2473,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_f8, rocblaslt_bf8, float, float>(
-                            &matmul_desc,
+                            handle, &matmul_desc,
                             &matA,
                             &matB,
                             &matC,
@@ -2509,7 +2511,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                                                             rocblaslt_bf8,
                                                             rocblaslt_half,
                                                             float>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status
@@ -2545,7 +2547,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                     float beta  = 1.0;
                     auto  prob
                         = construct_rocblaslt_problem<rocblaslt_bf8, rocblaslt_f8, float, float>(
-                            &matmul_desc,
+                            handle, &matmul_desc,
                             &matA,
                             &matB,
                             &matC,
@@ -2583,7 +2585,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                                                             rocblaslt_f8,
                                                             rocblaslt_half,
                                                             float>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status
@@ -2621,7 +2623,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                                                             hipblasLtInt8,
                                                             int32_t,
                                                             int32_t>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status = getAllSolutions<hipblasLtInt8, hipblasLtInt8, int32_t, int32_t>(
@@ -2654,7 +2656,7 @@ rocblaslt_status rocblaslt_matmul_get_all_algos_cpp(
                                                             hipblasLtInt8,
                                                             hipblasLtInt8,
                                                             int32_t>(
-                        &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
+                        handle, &matmul_desc, &matA, &matB, &matC, &matD, &alpha, &beta, maxWorkspaceSize);
                     if(typeGemm == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
                     {
                         status

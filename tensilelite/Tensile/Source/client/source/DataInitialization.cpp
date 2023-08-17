@@ -432,6 +432,7 @@ namespace Tensile
                                  TensorDescriptor const&    tensor,
                                  const std::vector<size_t>& batchIdx)
         {
+            // std::cout << "initGPUBatchedInput " << std::endl;
             std::vector<size_t> batchSizes;
             std::vector<size_t> batchStrides;
             for(auto& idx : batchIdx)
@@ -789,9 +790,14 @@ namespace Tensile
             {
                 std::string initName = "init-" + m_vdata[i].name;
                 std::string typeName = m_vdata[i].name + "-type";
+                
                 if(args.count(initName))
                 {
                     m_vdata[i].init = args[initName].as<InitMode>();
+                }
+                else if(m_vdata[i].name == "GSUSynczero")
+                {
+                    m_vdata[i].init = InitMode::Zero;
                 }
                 else
                 {
@@ -892,7 +898,13 @@ namespace Tensile
                     // Init and copy valid from cpu to gpu, only copies when != dependent data
                     if(!m_problemDependentData)
                     {
-
+                        // std::cout << "!m_problemDependentData" << std::endl;
+                        // std::cout << "p.first" << p.first << std::endl;
+                        // std::cout << "it.name" << it.name << std::endl;
+                        // std::cout << "it.init" << it.init << std::endl;
+                        // std::cout << "pUnit.gpuInput.valid.get()" << pUnit.gpuInput.valid.get() << std::endl;
+                        // std::cout << "pUnit.cpuInput.valid.get()" << pUnit.cpuInput.valid.get() << std::endl;
+                        // std::cout << "pUnit.maxElements" << pUnit.maxElements << std::endl;
                         initArray(p.first, it.init, pUnit.cpuInput.valid.get(), pUnit.maxElements);
                         HIP_CHECK_EXC(hipMemcpy(pUnit.gpuInput.valid.get(),
                                                 pUnit.cpuInput.valid.get(),
@@ -1099,6 +1111,7 @@ namespace Tensile
 
         void DataInitialization::initializeGPUBatchedInputs(ContractionProblemGemm const& problem)
         {
+            // std::cout << "initializeGPUBatchedInputs " << std::endl;
             auto batchIdxs = problem.batchIndices();
             // FIXME: batch not supported for bias
             for(size_t i = 0; i < 4 /*m_vdata.size()*/; i++)
@@ -1197,6 +1210,7 @@ namespace Tensile
                         if(p.second.initDescriptor != tensors[i])
                         {
                             p.second.initDescriptor = tensors[i];
+                            std::cout << "m_problemDependentData" << std::endl;
                             initArray(p.first,
                                       m_vdata[i].init,
                                       p.second.cpuInput.valid.get(),
@@ -1294,6 +1308,7 @@ namespace Tensile
                                             ContractionProblemGemm const&     problem,
                                             hipMemcpyKind                     kind)
         {
+            // std::cout << "copyInputs" << std::endl;
             ptrs.clear();
             batchPtrs.clear();
             maxElements.clear();
@@ -1301,6 +1316,7 @@ namespace Tensile
             {
                 for(size_t i = 0; i < m_vdata.size(); i++)
                 {
+                    std::cout << "NaN m_vdata[i].name" << m_vdata[i].name << std::endl;
                     void* ptr  = nullptr;
                     auto& desc = problem.tensors()[i];
                     auto  it   = m_vdata[i].pristine.find(desc.dataType());
@@ -1346,6 +1362,7 @@ namespace Tensile
             {
                 for(size_t i = 0; i < m_vdata.size(); i++)
                 {
+                    std::cout << "GuardPageBack m_vdata[i].name" << m_vdata[i].name << std::endl;
                     void* ptr  = nullptr;
                     auto& desc = problem.tensors()[i];
                     auto  it   = m_vdata[i].pristine.find(desc.dataType());
@@ -1388,6 +1405,7 @@ namespace Tensile
             {
                 for(size_t i = 0; i < m_vdata.size(); i++)
                 {
+                    // std::cout << "else m_vdata[i].name" << m_vdata[i].name << std::endl;
                     void* ptr  = nullptr;
                     auto& desc = problem.tensors()[i];
                     auto  it   = m_vdata[i].pristine.find(desc.dataType());
@@ -1395,23 +1413,41 @@ namespace Tensile
                     {
                         auto& p = it->second;
                         if(kind == hipMemcpyHostToHost)
+                        {
+                            // std::cout << "hipMemcpyHostToHost" << std::endl;
+                            // std::cout << "p.cpuInput.current.get()" << p.cpuInput.current.get() << std::endl;
+                            // std::cout << "p.cpuInput.valid.get()" << p.cpuInput.valid.get() << std::endl;
+                            // std::cout << "p.maxElements" << p.maxElements << std::endl;
                             ptr = copyInputBuffers(desc,
                                                    p.cpuInput.current.get(),
                                                    p.cpuInput.valid.get(),
                                                    p.maxElements,
                                                    kind);
+                        }
                         else if(kind == hipMemcpyHostToDevice)
+                        {
+                            std::cout << "hipMemcpyHostToDevice" << std::endl;
+                            std::cout << "p.gpuInput.current.get()" << p.gpuInput.current.get() << std::endl;
+                            std::cout << "p.cpuInput.valid.get()" << p.cpuInput.valid.get() << std::endl;
+                            std::cout << "p.maxElements" << p.maxElements << std::endl;
                             ptr = copyInputBuffers(desc,
                                                    p.gpuInput.current.get(),
                                                    p.cpuInput.valid.get(),
                                                    p.maxElements,
                                                    kind);
+                        }
                         else if(kind == hipMemcpyDeviceToDevice)
+                        {
+                            // std::cout << "hipMemcpyDeviceToDevice" << std::endl;
+                            // std::cout << "p.gpuInput.current.get()" << p.gpuInput.current.get() << std::endl;
+                            // std::cout << "p.gpuInput.valid.get()" << p.gpuInput.valid.get() << std::endl;
+                            // std::cout << "p.maxElements" << p.maxElements << std::endl;
                             ptr = copyInputBuffers(desc,
                                                    p.gpuInput.current.get(),
                                                    p.gpuInput.valid.get(),
                                                    p.maxElements,
                                                    kind);
+                        }
                         if(ptr == nullptr)
                         {
                             std::runtime_error("output ptr is null when copy input");
@@ -1488,6 +1524,7 @@ namespace Tensile
 
         void DataInitialization::copyValidToGPUBuffer(ContractionProblemGemm const& problem)
         {
+            // std::cout << "copyValidToGPUBuffer " << std::endl;
             for(size_t i = 0; i < m_vdata.size(); i++)
             {
                 void* ptr  = nullptr;
@@ -1526,6 +1563,7 @@ namespace Tensile
             inputs->scaleD        = (void*)ptrs[ContractionProblemGemm::TENSOR::SCALED];
             inputs->scaleAlphaVec = (void*)ptrs[ContractionProblemGemm::TENSOR::SCALEALPHAVEC];
             inputs->metadata      = (unsigned char*)ptrs[ContractionProblemGemm::TENSOR::METADATA];
+            inputs->GSUSynczero = (void*)ptrs[ContractionProblemGemm::TENSOR::GSUSynczero];
 
             inputs->batchA    = (void**)batchPtrs[ContractionProblemGemm::TENSOR::A];
             inputs->batchB    = (void**)batchPtrs[ContractionProblemGemm::TENSOR::B];
@@ -1635,6 +1673,13 @@ namespace Tensile
                     u8Ptr[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
                         += offsets[ContractionProblemGemm::TENSOR::SCALEALPHAVEC][idx]
                            * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
+                                 .elementBytes();
+                }
+                if(u8Ptr[ContractionProblemGemm::TENSOR::GSUSynczero] != nullptr)
+                {
+                    u8Ptr[ContractionProblemGemm::TENSOR::GSUSynczero]
+                        += offsets[ContractionProblemGemm::TENSOR::GSUSynczero][idx]
+                           * problem.tensors()[ContractionProblemGemm::TENSOR::GSUSynczero]
                                  .elementBytes();
                 }
             }

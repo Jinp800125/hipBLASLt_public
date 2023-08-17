@@ -2122,7 +2122,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if not kernel["SuppressNoLoadLoop"]:
         if kernel["KernelLanguage"] == "Assembly" and kernel["OptNoLoadLoop"] and \
            kernel["BufferLoad"] and kernel["BufferStore"] and self.states.doShadowInit and \
-           kernel["LocalSplitU"]==1 and kernel["GlobalSplitU"] == 1 and \
+           kernel["LocalSplitU"]==1 and (kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel') and \
            self.states.actualSummationLoops==1:
 
           # two different noLoadLoops:
@@ -2315,6 +2315,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self.globalReadIncrementAB(kernel, tensorParametersA, tensorParametersB, i, 0))
       module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, i, True))
 
+    # print("KernelWriter endSummation")
     module.add(self.endSummation(kernel, tensorParametersA, tensorParametersB))
     if not self.states.doShadowInit:
       module.add(self.globalWriteWorkGroupInit(kernel))
@@ -2756,6 +2757,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     self.states.bpeCexternal = self.states.bpeCinternal if kernel["_GlobalAccumulation"] else \
       int(self.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters())
+    # self.states.bpeCexternal = self.states.bpeCinternal if kernel["_GlobalAccumulation"] == "MultipleBuffer" else \
+    #   int(self.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters())
 
     # special case for wmma h and b
     if (kernel["EnableMatrixInstruction"]
@@ -3381,6 +3384,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("NumWorkGroups0", 1)
     self.defineSgpr("NumWorkGroups1", 1)
 
+    if self.states.doShadowInit and kernel["BufferStore"] and (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+      self.defineSgpr("SrdSync", 4, 4)
+      self.defineSgpr("WSDtmp", 2)
     ###################################
     # Get kernel argument start here
     ###################################
@@ -3420,6 +3426,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
     for idxChar in kernel["PackedC1IdxChars"][:-1]:
       self.defineSgpr("MagicNumberSize%s"%idxChar, 1)
       self.defineSgpr("MagicShiftSize%s"%idxChar, 1)
+
+    GSUAMBSK = 0
+    if (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+      GSUAMBSK = 1
+
+    if GSUAMBSK:
+      self.defineSgpr("AddressTC", numSgprAddressD)
+
     self.defineSgpr("Alpha", numSgprAlpha, numSgprAlpha)
     self.states.numSgprAlpha = numSgprAlpha
     if kernel["ProblemType"]["UseBeta"]:
@@ -3431,7 +3445,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if not kernel["ProblemType"]["GroupedGemm"]:
       self.states.numSgprGSU = 1
 
-
     # Calculate numSgpr preload
     self.states.numSgprPreload = 0
     if kernel["PreloadKernArgs"]:
@@ -3440,6 +3453,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # Workgroup ID x, y, z need 3 sgprs
       numWorkgroupIDSgpr = kernel["ProblemType"]["NumIndicesC"]
       self.states.numSgprPreload = 16 - self.states.rpga - kernel["ProblemType"]["NumIndicesC"]
+
+    if GSUAMBSK:
+      self.defineSgpr("GSUSync", 1)
 
     #------------------------
     # Registers defined below this point are not available in the post-loop
@@ -3453,7 +3469,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       numSgprAddressD + numSgprAddressC + numSgprAddressA + numSgprAddressB + numSgprAlpha + numSgprAddressMetadata + \
       (numSgprBeta if kernel["ProblemType"]["UseBeta"] else 0) + \
       self.states.d.numSgprStrides + self.states.c.numSgprStrides + self.states.a.numSgprStrides + self.states.b.numSgprStrides + self.states.m.numSgprStrides + \
-      len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + self.states.numSgprGSU
+      len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + self.states.numSgprGSU + \
+      (numSgprAddressD if GSUAMBSK == 1 else 0)
     # Get kernel argument end here
     ###################################
 
@@ -3563,10 +3580,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           self.states.useBias = DataDirection.WRITE
         elif kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B":
           self.states.useBias = DataDirection.WRITE
-      elif kernel["GlobalSplitU"] == 1:
+      elif kernel["GlobalSplitU"] == 1 or (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'): 
         self.states.useBias = DataDirection.READ
       # Need bias type if the kernel supports multiple bias type.
-    if self.states.useBias == DataDirection.READ or (self.states.useBias == DataDirection.WRITE and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B") and kernel["GlobalSplitU"] == 1):
+    if self.states.useBias == DataDirection.READ or (self.states.useBias == DataDirection.WRITE and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B") and (kernel["GlobalSplitU"] == 1 or (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'))):
       self.states.needBiasType = True
     else:
       self.states.needBiasType = False

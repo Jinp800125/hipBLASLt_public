@@ -591,6 +591,7 @@ namespace Tensile
         , m_boundIndices(boundIndices)
         , m_beta(beta)
     {
+        // std::cout << "Victoryes ContractionProblemGemm: " << scaleAlphaVec << std::endl;
         m_workspaceSize                                          = workspaceSize;
         m_tensors[ContractionProblemGemm::TENSOR::A]             = a;
         m_tensors[ContractionProblemGemm::TENSOR::B]             = b;
@@ -1398,6 +1399,7 @@ namespace Tensile
                                          void const*          _scaleD,
                                          void const*          _scaleAlphaVec,
                                          void*                _ws,
+                                         void*                _GSUSynczero,
                                          unsigned char const* _metadata)
         : a(_a)
         , b(_b)
@@ -1415,7 +1417,9 @@ namespace Tensile
         , scaleD(_scaleD)
         , scaleAlphaVec(_scaleAlphaVec)
         , ws(_ws)
+        , GSUSynczero(_GSUSynczero)
         , metadata(_metadata)
     {
+        std::cout << "Victoryes ContractionInputs: " << _GSUSynczero << std::endl;
     }
 } // namespace Tensile

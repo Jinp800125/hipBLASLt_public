@@ -175,6 +175,9 @@ class SignatureCOV3(Signature):
             signature.addArg("MagicNumberSize%s"%idxChar, SVK.SIG_VALUE,               "u32")
             signature.addArg( "MagicShiftSize%s"%idxChar, SVK.SIG_VALUE,               "u32")
 
+        if (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+            signature.addArg(    "dstD", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+
         # Note: We use packed f16 if alpha and beta are f16
         pack_cptValueType = 'pkf16' if kernel["ProblemType"]["ComputeDataType"].isHalf() else cptValueType
         signature.addArg(   "alpha",        SVK.SIG_VALUE, pack_cptValueType)
@@ -195,11 +198,11 @@ class SignatureCOV3(Signature):
             signature.addArg("AddressScaleC", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
             signature.addArg("AddressScaleD", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
 
-        if kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+        if kernel["ProblemType"]["UseScaleAlphaVec"] and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
             signature.addArg("AddressScaleAlphaVec", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
         userArgumentsInfo.scaleAlphaVecSize += 8
 
-        if writer.states.useBias != DataDirection.NONE and (kernel["GlobalSplitU"] == 1):
+        if writer.states.useBias != DataDirection.NONE and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
             signature.addArg("bias", SVK.SIG_GLOBALBUFFER, biasValueType, "generic")  # Note: We append the data in ws_d
             if writer.states.needBiasType:
                 signature.addArg("biasType",        SVK.SIG_VALUE,        "u32")
@@ -214,7 +217,7 @@ class SignatureCOV3(Signature):
         for i in range(0, writer.states.e.numSgprStrides):
             userArgumentsInfo.eSize += 4
 
-        if ((kernel["ProblemType"]["ActivationType"] != 'none') and (kernel["GlobalSplitU"] == 1) \
+        if ((kernel["ProblemType"]["ActivationType"] != 'none') and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")) \
             and kernel["ActivationFused"]):
             if kernel["ProblemType"]["ActivationComputeDataType"].isHalf():
                 actValueType = 'pkf16'
@@ -222,6 +225,11 @@ class SignatureCOV3(Signature):
                 signature.addArg(                   name, SVK.SIG_VALUE,        actValueType)
             if kernel["ProblemType"]["ActivationType"] == 'all':
                 signature.addArg(       "activationType", SVK.SIG_VALUE,               "u32")
+
+        if (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+            signature.addArg(               "GSUSync", SVK.SIG_VALUE,              "u32")
+            signature.addArg(               "GSUSynczero", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
+
         activationType = ActivationType("all")
         for name in activationType.getAdditionalArgStringList():
             userArgumentsInfo.activationSize += userArgumentsInfo.actMaxSize

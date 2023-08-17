@@ -223,6 +223,7 @@ class AddrCalculation:
         rowPtr = self.getRowPtr(kw, tc)
         addrVgpr = self.getAddrVgpr(kw, tc)
         bpe = kw.states.bpeCinternal if (tc == 'E') else kw.states.bpeCexternal
+        bpe = bpe if (tc != 'C') else kw.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters()
         # set when we generate code that updates the address
         # optSingleColVgpr and optSharedColVgpr attempt to minimize these updates
         updatedAddr = False
@@ -268,7 +269,7 @@ class AddrCalculation:
                                              src1=vgpr(self.addrBiasVgpr), \
                                              comment="add bias lds offset"))
                         return module
-                    if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                    if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
                         module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                                  shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                                  src=vgpr(self.coord0Vgpr), \
@@ -303,7 +304,7 @@ class AddrCalculation:
                                            src1=vgpr(self.addrBiasVgpr), \
                                            comment="add bias lds offset"))
                     return module
-                if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+                if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                              shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                              src=vgpr(self.coord0Vgpr), \
@@ -338,7 +339,7 @@ class AddrCalculation:
                                        src1=vgpr(self.addrBiasVgpr), \
                                        comment="add bias lds offset"))
                 return module
-            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                          shiftHex=hex(log2(kw.states.bpeCinternal)), \
                                          src=vgpr(self.coord0Vgpr), \
@@ -553,12 +554,32 @@ class AddrCalculation:
         module = Module("emitLdChange")
         if kernel["BufferStore"]:
             module.add(self.emitScaleToBpe(kernel, ss, tmpVgpr, tmpSgpr, singleUpdate, tc))
+
+            # if (kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") and (edge or singleUpdate) and (tc == 'C'):
+            #       module.addGSUSYNC("\n") #GSUSYNC
+
+            #       if kernel["ProblemType"]["DestDataType"].isHalf():
+            #         module.add(SNop(8))
+            #         module.add(VLShiftRightB32(dst=vgpr(addrVgpr), shiftHex=hex(1), src=vgpr(addrVgpr), comment="MultipleBufferSingleKernel bpe"))
+            #         module.add(SNop(8))
+            #       module.addGSUSYNC("//MultipleBufferSingleKernel emitLdChange\n") #GSUSYNC
+
             if edge and (not kernel["StoreRemapVectorWidth"] or (kernel["StoreRemapVectorWidth"] and beta)) and \
                 ((tc != 'Bias') and (tc != 'ScaleAlphaVec')):
                 module.add(VCndMaskB32(dst=vgpr(addrVgpr), src0=vgpr(bufferOOB), src1=vgpr(addrVgpr), \
                                src2=sgpr(mask,laneSGPRCount), comment="LD%s clip if OOB. offset" % tc ))
+
+            if (kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") and (edge or singleUpdate) and (tc == 'C'):
+                  module.addGSUSYNC("\n") #GSUSYNC
+
+                  # if kernel["ProblemType"]["DestDataType"].isHalf():
+                  #   module.add(SNop(8))
+                  #   module.add(VLShiftRightB32(dst=vgpr(addrVgpr), shiftHex=hex(1), src=vgpr(addrVgpr), comment="MultipleBufferSingleKernel bpe"))
+                  #   module.add(SNop(8))
+                  module.addGSUSYNC("//MultipleBufferSingleKernel emitLdChange\n") #GSUSYNC
+
         else:
-            if tc == 'Bias' and kernel["ProblemType"]["UseBias"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'Bias' and kernel["ProblemType"]["UseBias"] and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
                 module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr("WorkGroup0"), comment="wgp0 * MT0"))
                 module.add(VSubU32(dst=vgpr(self.addrBiasVgpr), src0=vgpr(self.coord0Vgpr), src1=sgpr(tmpSgpr)))
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrBiasVgpr), \
@@ -570,7 +591,7 @@ class AddrCalculation:
                                        src0=(kernel["LdsOffsetBias"]*kernel["ProblemType"]["DataType"].numBytes()), \
                                        src1=vgpr(self.addrBiasVgpr), \
                                        comment="add bias lds offset"))
-            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and (kernel["GlobalSplitU"] == 1):
+            if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and ((kernel["GlobalSplitU"] == 1) or (kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
                                         shiftHex=hex(log2(self.kernelWriter.states.bpeCinternal)), \
                                         src=vgpr(self.coord0Vgpr), \
@@ -594,6 +615,8 @@ class AddrCalculation:
         module = Module("incrementToNextRow")
         numRows = self.rowInc
         tmpBpe = self.kernelWriter.states.bpeCinternal if isCompute else self.kernelWriter.states.bpeCexternal
+        if (tc == 'C' or tc == 'TD') and (kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel"):
+            tmpBpe = int(tmpBpe/2)
         if ss.optSrdIncForRow:
             if numRows:
                 packedC1 = kernel["PackedC1IndicesX"]
@@ -602,7 +625,11 @@ class AddrCalculation:
                     index = packedC1[0] - 1
                     strideCD1 = "Size%s" % "I" if index == 0 else ("J" if index == 1 else (self.kernelWriter.states.indexChars[index]))
                 else:
-                    strideCD1 = "Stride%s%s"%(tc,self.kernelWriter.states.indexChars[packedC1[0]])
+                    if tc == 'TD' and (not kernel["WorkGroupReduction"]):
+                        td = 'D'
+                        strideCD1 = "Stride%s%s"%(td,self.kernelWriter.states.indexChars[packedC1[0]])
+                    else:
+                        strideCD1 = "Stride%s%s"%(tc,self.kernelWriter.states.indexChars[packedC1[0]])
                 if numRows > 1:
                     module.add(SMulI32(dst=sgpr(stmp), \
                                 src0=sgpr(strideCD1), \

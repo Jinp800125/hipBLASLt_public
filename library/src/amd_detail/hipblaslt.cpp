@@ -109,9 +109,19 @@ extern "C" {
         }                                                               \
     }
 
+void *d_GSUSynczero = nullptr;
+#include <iostream>
+
 hipblasStatus_t hipblasLtCreate(hipblasLtHandle_t* handle)
 try
 {
+    if(1)
+    {
+        (hipMalloc(&d_GSUSynczero, 1024 * sizeof(int)));
+    }
+    if(1)
+        (hipMemset(d_GSUSynczero, 0, sizeof(int) * 1024));
+
     // Check if handle is valid
     if(handle == nullptr)
     {
@@ -126,6 +136,11 @@ try
     if(err == hipSuccess)
     {
         retval = RocBlasLtStatusToHIPStatus(rocblaslt_create((rocblaslt_handle*)handle));
+        rocblaslt_handle* tmp1 = (rocblaslt_handle*)handle;
+        // std::cout << "d_GSUSynczero" << d_GSUSynczero << std::endl;
+        (*(rocblaslt_handle*)tmp1)->GSUSynczero = d_GSUSynczero;
+        // std::cout << (*(rocblaslt_handle*)tmp1)->GSUSynczero << std::endl;
+        // (*((rocblaslt_handle*)handle))->GSUSynczero = d_GSUSynczero;
     }
     return retval;
 }
@@ -137,6 +152,9 @@ catch(...)
 hipblasStatus_t hipblasLtDestroy(const hipblasLtHandle_t handle)
 try
 {
+    if(1)
+        (hipFree(d_GSUSynczero));
+
     return RocBlasLtStatusToHIPStatus(rocblaslt_destroy((const rocblaslt_handle)handle));
 }
 catch(...)
