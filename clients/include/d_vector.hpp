@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -155,7 +155,18 @@ public:
                           hipSuccess);
 
                 // Make sure no corruption has occurred
-                EXPECT_EQ(memcmp(host, m_guard, m_guard_len), 0);
+                auto result = memcmp(host, m_guard, m_guard_len);
+                if(result != 0)
+                {
+                    std::cout << "pad " << m_pad * sizeof(T) << " m_guard_len " << m_guard_len
+                              << std::endl;
+                    for(size_t i = 0; i < m_pad; i++)
+                    {
+                        std::cout << "[" << i << "] " << (float)host[i] << " vs "
+                                  << (float)m_guard[i] << std::endl;
+                    }
+                }
+                EXPECT_EQ(result, 0);
 
                 // Point to m_guard before allocated memory
                 d -= m_pad;
