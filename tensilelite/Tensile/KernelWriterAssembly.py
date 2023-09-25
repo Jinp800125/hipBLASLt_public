@@ -4385,7 +4385,7 @@ class KernelWriterAssembly(KernelWriter):
 
     # Load kernel args end
     ########################################
-    # module.addComment1("self.SrdTC(kernel)")
+    module.addComment1("self.SrdTC(kernel)")
     # copy accumulated C from agpr to vgpr
     if kernel["EnableMatrixInstruction"]:
       #TODO avoid s_nop if its possible
@@ -8824,7 +8824,7 @@ class KernelWriterAssembly(KernelWriter):
           isSlc = True
         if kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
           isGlc = True
-          # isSlc = True
+          isSlc = True
 
         bps = self.states.bpeCexternal * ss.cfg.gwvw
         rpv = self.states.bpeCexternal * ss.cfg.gwvw / self.states.bpr
@@ -8839,9 +8839,8 @@ class KernelWriterAssembly(KernelWriter):
           module.add(addrCalc.incrementToNextRow(kernel, "D", ss, tmpS01))
         dataType     = kernel["ProblemType"]["DestDataType"]
         globalOffset = addrCalc.globalOffset
-        if kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
-          module.addGSUSYNC("//globalOffset "+str(globalOffset))
-          module.addSpaceLine()
+        module.addGSUSYNC("//globalOffset "+str(globalOffset))
+        module.addSpaceLine()
       elif tc == 'TD':
         # if kernel["NonTemporalD"]%2==1:
         #   isGlc = True
@@ -8872,10 +8871,9 @@ class KernelWriterAssembly(KernelWriter):
         globalOffset = addrCalc.globalOffset
         # globalOffset = addrCalc.coordOffset0 * int(self.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters())
         if kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
-          globalOffset = int(globalOffset/2)
-        if kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
-          module.addGSUSYNC("//globalOffset "+str(globalOffset))
-          module.addSpaceLine()
+          globalOffset = int((globalOffset/self.states.bpeCexternal) * self.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters()) #int(globalOffset/2)
+        module.addGSUSYNC("//globalOffset "+str(globalOffset))
+        module.addSpaceLine()
       elif tc == 'E' or tc == 'Bias':
         bps = self.states.bpeCinternal * ss.cfg.gwvw
         rpv = self.states.bpeCinternal * ss.cfg.gwvw / self.states.bpr
@@ -8951,7 +8949,7 @@ class KernelWriterAssembly(KernelWriter):
       # if tc == 'C' and gwvw == 2:
       if tc == 'C':
         if kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
-          globalOffset = int(globalOffset/2)
+          globalOffset = globalOffset = int((globalOffset/self.states.bpeCexternal) * self.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters()) #int(globalOffset/2)
         module.addGSUSYNC("//globalOffset "+str(globalOffset))
         module.addSpaceLine()
       isCompute    = False

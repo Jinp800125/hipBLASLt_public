@@ -395,7 +395,7 @@ class GlobalWriteBatchWriter:
     module.add(SMovB32(dst=sgpr(tmpS01), src=sgpr("GSU"), comment=""))
 
     module.add(Victorlabel)
-    if 0:
+    if 1:
       module.add(SAddU32(dst=sgpr(tmpS06+0), \
                                         src0=sgpr(tmpS06+0), \
                                         src1=sgpr(tmpS04+0), \
@@ -561,52 +561,6 @@ class GlobalWriteBatchWriter:
             comment=""))
         module.add(SCBranchSCC0(labelName=Victorlabel.getLabelName(), comment=""))
 
-    # for i in range(0,GSU-1):
-    #   module.add(SAddU32(dst=sgpr(tmpS06+0), \
-    #                                   src0=sgpr(tmpS06+0), \
-    #                                   src1=sgpr(tmpS04+0), \
-    #                                   comment="" ))
-    #   module.add(SNop(8))
-    #   module.add(SAddCU32(dst=sgpr(tmpS06+1), \
-    #                       src0=sgpr(tmpS06+1), \
-    #                       src1=sgpr(tmpS04+1), \
-    #                       comment="" ))
-    #   module.add(SNop(8))
-    #   # module.addGSUSYNC("buffer_load_dwordx4 v["+str(tmpVAdd)+"+4*"+str(i)+":"+str(tmpVAdd)+"+3+4*"+str(i)+"], v"+str(vgproffset)+", s[sgprSrdD:sgprSrdD+3], 0 offen offset:0 // load GSU D\n")
-    #   module.add(self.parentWriter.chooseGlobalRead(True, bps, tmpVAdd+4*i, \
-    #                 addr0, addr1, soffset=0, offset=globalOffset,
-    #                 comment="load GSU D"))
-    #   module.add(SNop(8))
-    #   SyncloadedData += 1
-    #   # # if GWVW=1 the half path still assumes we have
-    #   # # at least two stores so does some combining across VI -
-    #   # # for example assuming we can have two elements and can use pk_mul
-    #   # # here:
-    # module.addComment("buffer load end\n")
-
-    # module.addComment("buffer add start")
-    # vscnt = 0
-    # lgkmcnt = -1
-    
-    # vmcnt = SyncloadedData = SyncloadedData -1
-
-    # for i in range(0, self.kernel["GlobalSplitU"]-1):
-    #   module.addSpaceLine()
-    #   vmcnt = SyncloadedData = SyncloadedData -1
-    #   module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="(Victor yes)"))
-    #   # module.add(VAddPKF32(dst=vgpr(vgprstart, 2), src0=vgpr(vgprstart, 2), \
-    #   #                                src1=vgpr(tmpVAdd+0+4*i, 2), comment="C += bias"))
-    #   # module.add(VAddPKF32(dst=vgpr(vgprstart+2, 2), src0=vgpr(vgprstart+2, 2), \
-    #   #                                src1=vgpr(tmpVAdd+2+4*i, 2), comment="C += bias"))
-    #   module.add(VAddF32(dst=vgpr(vgprstart+0), src0=vgpr(vgprstart+0), src1=vgpr(tmpVAdd+0+4*i+0), \
-    #                     comment="buffer add"))
-    #   module.add(VAddF32(dst=vgpr(vgprstart+1), src0=vgpr(vgprstart+1), src1=vgpr(tmpVAdd+0+4*i+1), \
-    #                     comment="buffer add"))
-    #   module.add(VAddF32(dst=vgpr(vgprstart+2), src0=vgpr(vgprstart+2), src1=vgpr(tmpVAdd+0+4*i+2), \
-    #                     comment="buffer add"))
-    #   module.add(VAddF32(dst=vgpr(vgprstart+3), src0=vgpr(vgprstart+3), src1=vgpr(tmpVAdd+0+4*i+3), \
-    #                     comment="buffer add"))
-
     module.addComment("buffer add end")
 
     self.parentWriter.sgprPool.checkIn(tmpS06)
@@ -735,14 +689,8 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
           else:
             module.add(self.parentWriter.readInput(self.kernel, self.ss, 'C', self.kernel["ProblemType"]["DestDataType"], addrCalc, vc0, data, self.gwvw, addrCVgpr, self.tmpS01))
           
-          if (self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") and (self.edge or (elementIdx == 0)):
-            module.addGSUSYNC("\n") #GSUSYNC
-
-            # if self.kernel["ProblemType"]["DestDataType"].isHalf():
-            #   module.add(SNop(0))
-            #   module.add(VLShiftLeftB32(dst=vgpr(addrCVgpr), shiftHex=hex(1), src=vgpr(addrCVgpr), comment="MultipleBufferSingleKernel bpe shift back"))
-            #   module.add(SNop(0))
-            module.addGSUSYNC("//MultipleBufferSingleKernel emitLdChange\n") #GSUSYNC
+          # if (self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") and (self.edge or (elementIdx == 0)):
+          #   module.addGSUSYNC("//MultipleBufferSingleKernel emitLdChange\n") #GSUSYNC
 
           loadedDataBeta[dataBeta] = ceil(self.kernel["ProblemType"]["DestDataType"].numBytes() * self.ss.cfg.gwvw / 16)
           self.loadsBetaIssued += ceil(self.kernel["ProblemType"]["DestDataType"].numBytes() * self.gwvw / 16)
@@ -868,17 +816,6 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
     module.add(SWaitCnt(waitAll=True, comment="wait store done before synchronizer ALL"))
     module.addGSUSYNC("//MultipleBufferSingleKernel store after Acc\n") #GSUSYNC
 
-    if 0: #not issingle:
-        vgprstart = self.ss.elementSumIdx[elementIdx] - self.parentWriter.states.c.startVgprValu
-        contents = \
-        "\n\
-v_mov_b32 v["+str(vgprstart)+"+0], 256.0 \n\
-v_mov_b32 v["+str(vgprstart)+"+1], 256.0 \n\
-v_mov_b32 v["+str(vgprstart)+"+2], 256.0 \n\
-v_mov_b32 v["+str(vgprstart)+"+3], 256.0 \n\
-\n\
-//force 1 store\n"
-        module.addGSUSYNC(contents)
     ########################################################
 
     storeCodeGSUGSU = Module("GroupLoadStore")
@@ -1191,8 +1128,8 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"2+1]\n"
           module.addSpaceLine()
           if not self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
             module.add(SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="%s (interleaved)"%comment))
-        elif self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
-          module.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="%d(interleaved%dVictor)%d"%(lgkmcnt, vmcnt, vscnt)))
+        # elif self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
+        #   module.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="%d(interleaved%dVictor)%d"%(lgkmcnt, vmcnt, vscnt)))
 
       scaleAlphaVecModule = Module("scaleAlphaVecModule")
       if self.kernel["ProblemType"]["UseScaleAlphaVec"] and ((self.kernel["GlobalSplitU"] == 1) or (self.kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel")):
@@ -1951,12 +1888,6 @@ v_pack_b32_f16 v["+str(sumIdx)+"+1], v["+str(sumIdx)+"+2], v["+str(sumIdx)+"+3]\
               src1=vgpr(dataCExternal), src2=vgpr("ValuC+%u"%newSumIdxV), \
               vop3=VOP3PModifiers(op_sel=[0,hi16,0], op_sel_hi=[0,1,0]),
               comment="//C*=beta"))
-          # scaleAlphaVecModule.add(VCvtF16toF32(dst=vgpr(dataCExternal), src=vgpr(dataCExternal)))
-          # module.add(VMulF32(dst=vgpr(dataCExternal), src0=sgpr("Beta"), src1=vgpr(dataCExternal), comment="this batch offset"))
-          # module.add(VAddF32(dst=vgpr("ValuC+%u"%newSumIdxV), \
-          #                           src0=vgpr(dataCExternal), \
-          #                           src1=vgpr("ValuC+%u"%newSumIdxV), \
-          #                           comment="" ))
 
       elif kernel["ProblemType"]["DestDataType"].isBFloat16():
         if kernel["ProblemType"]["HighPrecisionAccumulate"]:

@@ -1154,10 +1154,10 @@ class Solution(collections.abc.Mapping):
       state["KernelLanguage"] = "Source"
       state["_GlobalAccumulation"] = self["_GlobalAccumulation"]
       state["ActivationFused"] = self["ActivationFused"]
-      print("GlobalSplitU", self["GlobalSplitU"])
-      print("_GlobalAccumulation", self["_GlobalAccumulation"])
-      print("ActivationFused", self["ActivationFused"])
-      print("ActivationType", self["ProblemType"]["ActivationType"])
+      # print("GlobalSplitU", self["GlobalSplitU"])
+      # print("_GlobalAccumulation", self["_GlobalAccumulation"])
+      # print("ActivationFused", self["ActivationFused"])
+      # print("ActivationType", self["ProblemType"]["ActivationType"])
       self.activationOnlyKernelObjects.append(KernelWriterActivationOnly(state))
 
   def initReductionKernelObjects(self):
@@ -1188,6 +1188,7 @@ class Solution(collections.abc.Mapping):
   # get Helper Kernels
   def getKernelConversionObjects(self):
     return self.conversionKernelObjects
+
 
   @staticmethod
   def getMIOutputInfo(state):
@@ -3270,11 +3271,11 @@ class Solution(collections.abc.Mapping):
         reject(state, "Currently SupportUserArgs does not support GSU > 1.")
 
     if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
-      print(state["MatrixInstruction"])
+      # print(state["MatrixInstruction"])
       # if state["MatrixInstruction"] != [16, 16, 16, 1] and state["MatrixInstruction"] != [16, 16, 4, 1]:
       #   reject(state, "Victor reject MatrixInstruction.")
-      if state["StoreRemapVectorWidth"]:
-        reject(state, "Victor reject StoreRemapVectorWidth.")
+      # if state["StoreRemapVectorWidth"]:
+      #   reject(state, "Victor reject StoreRemapVectorWidth.")
       # if state["SourceSwap"]:
       #   reject(state, "Victor reject SourceSwap.")
       if state["StoreVectorWidth"] != 4:
