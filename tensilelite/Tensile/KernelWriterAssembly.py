@@ -7385,7 +7385,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   # Store Remap: Local Write
   ##############################################################################
-  def storeRemapAddLocalWrite(self, ss, addrCalc, srcVgpr):
+  def storeRemapAddLocalWrite(self, kernel, ss, addrCalc, srcVgpr):
     """
     Add localWrite for the element with addrCalc and srcVgpr.
     """
@@ -7393,6 +7393,9 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("storeRemapAddLocalWrite srcVgpr %s"%str(srcVgpr))
 
     bps = self.states.bpeCexternal * ss.cfg.gwvw
+    # if kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+    #   bps = self.states.bpeCinternal * ss.cfg.gwvw
+    module.addGSUSYNC("// bps : "+str(bps)+"\n")
     rpv = self.states.bpeCexternal * ss.cfg.gwvw / self.states.bpr
 
     addr0  = vgpr(self.vgprs.storeRemapLW)

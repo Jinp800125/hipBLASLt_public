@@ -385,7 +385,7 @@ class GlobalWriteBatchWriter:
                     comment="load GSU D 0"))
     SyncloadedData += 1
     module.add(SNop(1))
-    tmpVAdd = self.parentWriter.vgprPool.checkOutAligned((self.kernel["GlobalSplitU"])*4, 4)
+    # tmpVAdd = self.parentWriter.vgprPool.checkOutAligned((self.kernel["GlobalSplitU"])*4, 4)
 
     VictorlabelString = "Victor_read_add"
     VictorlabelComment = "Victor_Write (Beta) (Edge) vc0 vc1 d0 d1"
@@ -396,6 +396,7 @@ class GlobalWriteBatchWriter:
 
     module.add(Victorlabel)
     if 1:
+      tmpVAdd = self.parentWriter.vgprPool.checkOutAligned((1)*4, 4)
       module.add(SAddU32(dst=sgpr(tmpS06+0), \
                                         src0=sgpr(tmpS06+0), \
                                         src1=sgpr(tmpS04+0), \
@@ -431,10 +432,18 @@ class GlobalWriteBatchWriter:
   //force 1 store\n"
           module.addGSUSYNC(contents)
 
-      module.add(VAddPKF32(dst=vgpr(vgprstart, 2), src0=vgpr(vgprstart, 2), \
-                                     src1=vgpr(tmpVAdd+0+4*i, 2), comment="C += bias"))
-      module.add(VAddPKF32(dst=vgpr(vgprstart+2, 2), src0=vgpr(vgprstart+2, 2), \
-                                     src1=vgpr(tmpVAdd+2+4*i, 2), comment="C += bias"))
+      # module.add(VAddPKF32(dst=vgpr(vgprstart, 2), src0=vgpr(vgprstart, 2), \
+      #                                src1=vgpr(tmpVAdd+0+4*i, 2), comment="C += bias"))
+      # module.add(VAddPKF32(dst=vgpr(vgprstart+2, 2), src0=vgpr(vgprstart+2, 2), \
+      #                                src1=vgpr(tmpVAdd+2+4*i, 2), comment="C += bias"))
+      module.add(VAddF32(dst=vgpr(vgprstart+0), src0=vgpr(vgprstart+0), src1=vgpr(tmpVAdd+0+4*i+0), \
+                        comment="buffer add"))
+      module.add(VAddF32(dst=vgpr(vgprstart+1), src0=vgpr(vgprstart+1), src1=vgpr(tmpVAdd+0+4*i+1), \
+                        comment="buffer add"))
+      module.add(VAddF32(dst=vgpr(vgprstart+2), src0=vgpr(vgprstart+2), src1=vgpr(tmpVAdd+0+4*i+2), \
+                        comment="buffer add"))
+      module.add(VAddF32(dst=vgpr(vgprstart+3), src0=vgpr(vgprstart+3), src1=vgpr(tmpVAdd+0+4*i+3), \
+                        comment="buffer add"))
       module.add(SSubU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=hex(1), comment=""))
       # module.add(SNop(1))
       module.add(SCmpEQU32(
@@ -443,6 +452,7 @@ class GlobalWriteBatchWriter:
           comment=""))
       module.add(SCBranchSCC0(labelName=Victorlabel.getLabelName(), comment=""))
     else:
+      tmpVAdd = self.parentWriter.vgprPool.checkOutAligned((self.kernel["GlobalSplitU"])*4, 4)
       if 1:
         for i in range(0,GSU-1):
           module.add(SAddU32(dst=sgpr(tmpS06+0), \
@@ -826,8 +836,8 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
           vgprDst = self.activationSetPCStruct.vgprActCopy if mergeActFuncCall else "ValuC+%d"%vgprIdx
           module.add(self.parentWriter.addStore(self.kernel, self.ss, 'E', addrCalc, vgprDst, self.tmpS01, self.edge, comment="store E"))
 
+        sumIdx = self.ss.elementSumIdx[elementIdx]
         if not self.kernel["StoreRemapVectorWidth"]:
-          sumIdx = self.ss.elementSumIdx[elementIdx]
           tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'D', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store D Victor")
           if self.kernel["GroupLoadStore"]:
             storeCodeGSUGSU.add(tmpStoreCode)
@@ -836,11 +846,24 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
             module.add(tmpStoreCode)
         else:
           rpe = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr
-          module.add(self.parentWriter.storeRemapAddLocalWrite(self.ss, addrCalc, sumIdx*rpe))
+          module.add(self.parentWriter.storeRemapAddLocalWrite(self.kernel, self.ss, addrCalc, sumIdx*rpe))
           # Column Block Shape has been written to LDS
           # Now read back and write out to global memory
 
       module.add(storeCodeGSUGSU)
+
+    if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel" and self.kernel["StoreRemapVectorWidth"]:
+      if self.parentWriter.StoreRemapLastBatch == 1:
+        module.addComment1("Handle local read and global write")
+        # this seems buggy? it's possible to issue more than one stores for SR
+        # module.add(self.storeRemapAddStore(kernel, tmpVgpr, tmpS01, edge))
+        # storesIssued += 1
+        storeModule, numNewStores = self.parentWriter.storeRemapAddStore(self.kernel, self.tmpVgpr, self.tmpS01, self.edge)
+        module.add(storeModule)
+        self.storesIssued += numNewStores
+
+    if self.parentWriter.states.serializedStore:
+      module.add(SNop(0, "HELLO 1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
 
     if self.parentWriter.states.serializedStore and self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
       module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
@@ -854,8 +877,10 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
       Victorlabel = Label(self.parentWriter.labels.getName(VictorlabelString), VictorlabelComment)
       module.addGSUSYNC("//") #GSUSYNC
       module.add(Victorlabel)
+    module.addGSUSYNC("//GSUSYNCcodegen1\n") #GSUSYNC
     if 0: #self.kernel["StoreVectorWidth"]==2:
       module.add(self.GSUSYNCcodegen(self.kernel["GlobalSplitU"], self.kernel["MacroTile0"], self.kernel["MacroTile1"], "label_KernelEnd", sumIdxGSUSYNC, self.ss.elementSumIdx[elementIdx-1], vgpr(self.ss.elementAddr[elementIdx-1].addrDVgpr)))
+    # elif self.kernel["StoreRemapVectorWidth"]:
     else:
       if (self.kernel["GlobalSplitU"] != 1 and self.kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
         module.add(self.GSUSYNCcodegen(self.kernel["GlobalSplitU"], self.kernel["MIWaveGroup"][0], self.kernel["MIWaveGroup"][1], self.kernel["StoreVectorWidth"], Victorlabel.getLabelName(), sumIdxGSUSYNC, addrCalc.globalOffset, addrCalc.addrDVgpr))
@@ -880,6 +905,8 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
     checkedDataBias = {}
     checkedDataScaleAlphaVec = {}
     for elementIdx in range(len(self.batchElements)):
+      sumIdxGSUSYNC = self.ss.elementSumIdx[elementIdx]
+      addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
       if not self.ss.sharedColDVgprs:
         addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
         addrEVgpr    = addrCalc.addrEVgpr
@@ -923,7 +950,7 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
 
     self.ss.firstBatch = False
     self.ss.checkInTempVgprC()
-    if self.kernel["StoreRemapVectorWidth"]:
+    if self.kernel["_GlobalAccumulation"] != "MultipleBufferSingleKernel" and self.kernel["StoreRemapVectorWidth"]:
       if self.parentWriter.StoreRemapLastBatch == 1:
         module.addComment1("Handle local read and global write")
         # this seems buggy? it's possible to issue more than one stores for SR
@@ -935,6 +962,28 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"+3]\n"
 
     if self.parentWriter.states.serializedStore:
       module.add(SNop(0, "HELLO 1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
+
+
+    module.addGSUSYNC("//GSUSYNCcodegen2\n") #GSUSYNC
+    # if 0: #self.kernel["StoreVectorWidth"]==2:
+    #   module.add(self.GSUSYNCcodegen(self.kernel["GlobalSplitU"], self.kernel["MacroTile0"], self.kernel["MacroTile1"], "label_KernelEnd", sumIdxGSUSYNC, self.ss.elementSumIdx[elementIdx-1], vgpr(self.ss.elementAddr[elementIdx-1].addrDVgpr)))
+    # elif self.kernel["StoreRemapVectorWidth"]:
+    #   if self.parentWriter.states.serializedStore and self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
+    #     module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
+    #   ########################################################
+    #   # module.addComment("GSUSYNC label_BUSYWAIT1 label_Activation_End 24 v9") #GSUSYNC
+
+    #     module.addGSUSYNC("\n") #GSUSYNC
+    #     VictorlabelString = "Victor_Write%s%s" % ("_Beta" if self.beta else "", "_Edge" if self.edge else "" )
+    #     VictorlabelComment = "Victor_Write (Beta) (Edge) vc0 vc1 d0 d1"
+    #     Victorlabel = Label(self.parentWriter.labels.getNameInc(VictorlabelString), VictorlabelComment)
+    #     Victorlabel = Label(self.parentWriter.labels.getName(VictorlabelString), VictorlabelComment)
+    #     module.addGSUSYNC("//") #GSUSYNC
+    #     module.add(Victorlabel) 
+    #   if (self.kernel["GlobalSplitU"] != 1 and self.kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+    #     module.add(self.GSUSYNCcodegen(self.kernel["GlobalSplitU"], self.kernel["MIWaveGroup"][0], self.kernel["MIWaveGroup"][1], self.kernel["StoreVectorWidth"], Victorlabel.getLabelName(), sumIdxGSUSYNC, addrCalc.globalOffset, addrCalc.addrDVgpr))
+
+    # module.addGSUSYNC("\n") #GSUSYNC
 
   def _emitAdd(self, module: Module):
     if self.atomic:
@@ -1348,15 +1397,19 @@ v_mov_b32 v["+str(vgprstart)+"+1], v["+str(vgprstart)+"2+1]\n"
         biasReductionModule.add(self.parentWriter.addStore(self.kernel, self.ss, 'Bias', addrCalc, "ValuC+%d"%vgprIdx, self.tmpS01, self.edge, comment="store Bias"))
 
       if isActivationInsertAfter:
-        module.add(convertModule)
-        module.add(packModule)
+        module.addGSUSYNC("//convert1\n")
+        if 1: #self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel" and not self.kernel["StoreRemapVectorWidth"]:
+          module.add(convertModule)
+          module.add(packModule)
         module.add(activationModule)
       else:
         module.add(activationModule)
         module.add(scaleDModule)
         module.add(biasReductionModule)
-        module.add(convertModule)
-        module.add(packModule)
+        module.addGSUSYNC("//convert2\n")
+        if 1: #self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel" and not self.kernel["StoreRemapVectorWidth"]:
+          module.add(convertModule)
+          module.add(packModule)
       VictorlabelString = "Victor_Write%s%s" % ("_Beta" if self.beta else "", "_Edge" if self.edge else "" )
       VictorlabelComment = "Victor_Write (Beta) (Edge) vc0 vc1 d0 d1"
       Victorlabel = Label(self.parentWriter.labels.getName(VictorlabelString), VictorlabelComment)
@@ -1415,10 +1468,47 @@ v_pack_b32_f16 v["+str(sumIdx)+"+1], v["+str(sumIdx)+"+2], v["+str(sumIdx)+"+3]\
           self.storesIssued += 1
 
       else:
-        rpe = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr
-        module.add(self.parentWriter.storeRemapAddLocalWrite(self.ss, addrCalc, sumIdx*rpe))
-        # Column Block Shape has been written to LDS
-        # Now read back and write out to global memory
+        if not self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU 
+          rpe = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr
+          module.addGSUSYNC("// rpe : "+str(rpe)+"\n")
+          module.add(self.parentWriter.storeRemapAddLocalWrite(self.kernel, self.ss, addrCalc, sumIdx*rpe))
+          # Column Block Shape has been written to LDS
+          # Now read back and write out to global memory
+        else:
+          if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
+            tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'TD', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store TD not StoreRemapVectorWidth")
+          else:
+            tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'D', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store D not StoreRemapVectorWidth")
+          if self.kernel["GroupLoadStore"]:
+            storeCode.add(tmpStoreCode)
+          else:
+            # if 0:
+            if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
+              if (not self.kernel["ProblemType"]["DestDataType"].isSingle()):
+                module.add(VLShiftRightB32(dst=vgpr(addrCalc.addrDVgpr), shiftHex=hex(1), src=vgpr(addrCalc.addrDVgpr), comment="HELLO shift"))
+                module.add(SNop(0))
+                # module.add(VLShiftRightB32(dst=vgpr(addrCalc.addrDVgpr), shiftHex=hex(1), src=vgpr(addrCalc.addrDVgpr), comment="HELLO shift"))
+              # module.add(self.parentWriter.SrdTC(self.kernel))
+            module.add(tmpStoreCode)
+            if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
+              module.add(SNop(0))
+              module.add(SWaitCnt(vmcnt=0, vscnt=0, comment="Victor wait for stores to complete"))
+            if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
+              if (not self.kernel["ProblemType"]["DestDataType"].isSingle()):
+                module.add(VLShiftLeftB32(dst=vgpr(addrCalc.addrDVgpr), shiftHex=hex(1), src=vgpr(addrCalc.addrDVgpr), comment="HELLO shift"))
+                module.add(SNop(0))
+                # module.add(VMovB32(vgpr(addrCalc.addrDVgpr), hex(0), "Hello zero" ))
+            # module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
+          self.storesIssued += 1
+          if (self.kernel["ProblemType"]["UseE"] and not self.kernel["ProblemType"]["Gradient"]) and (self.kernel["GlobalSplitU"] == 1):
+            self.storesIssued += 1
+          if self.storeBiasD == 1:
+            self.storesIssued += 1
+
+      # if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel" and self.kernel["StoreRemapVectorWidth"]:
+      #     module.addGSUSYNC("//convert3\n")
+      #     module.add(convertModule)
+      #     module.add(packModule)
 
     module.add(storeCode)
 
