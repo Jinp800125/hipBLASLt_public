@@ -632,15 +632,17 @@ class AddrCalculation:
                                 src=sgpr(strideCD1), \
                                 shiftHex=log2(tmpBpe), \
                                 comment="incToNextRow: Scale by BPE"))
-
+                    module.add(SNop(8))
                 module.add(SAddU32(dst=sgpr("Srd%s+0"%(tc)), \
                                     src0=sgpr("Srd%s+0"%(tc)), \
                                     src1=sgpr(stmp), \
                                     comment="incToNextRow: gra SRD += inc(lower)" ))
+                module.add(SNop(8))
                 module.add(SAddCU32(dst=sgpr("Srd%s+1"%(tc)), \
                                     src0=sgpr("Srd%s+1"%(tc)), \
                                     src1=0, \
                                     comment="incToNextRow: gra SRD += inc(upper)" ))
+                module.add(SNop(8))
 
             None
 

@@ -3274,12 +3274,12 @@ class Solution(collections.abc.Mapping):
       # print(state["MatrixInstruction"])
       # if state["MatrixInstruction"] != [16, 16, 16, 1] and state["MatrixInstruction"] != [16, 16, 4, 1]:
       #   reject(state, "Victor reject MatrixInstruction.")
-      # if state["StoreRemapVectorWidth"]:
-      #   reject(state, "Victor reject StoreRemapVectorWidth.")
+      if state["StoreRemapVectorWidth"] and (state["MIWaveTile"][0] != [1] or state["MIWaveTile"][1] != [1]):
+        reject(state, "Victor reject StoreRemapVectorWidth.")
       # if state["SourceSwap"]:
       #   reject(state, "Victor reject SourceSwap.")
-      if state["StoreVectorWidth"] != 4:
-        reject(state, "Victor reject StoreVectorWidth.")
+      # if state["StoreVectorWidth"] == 1:
+      #   reject(state, "Victor reject StoreVectorWidth.")
 
   ########################################
   # create a dictionary with booleans on whether to include parameter in name

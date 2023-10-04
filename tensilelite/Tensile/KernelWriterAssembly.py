@@ -510,10 +510,10 @@ class KernelWriterAssembly(KernelWriter):
       self.states.numStoreSgprNames.append("GSUSync2")
       self.states.numStoreSgprNameSizes.append(1)
 
-    if kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
-      storeSgprLoad += self.states.rpga
-      self.states.numStoreSgprNames.append("GSUSynczero")
-      self.states.numStoreSgprNameSizes.append(self.states.rpga)
+    # if kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+    #   storeSgprLoad += self.states.rpga
+    #   self.states.numStoreSgprNames.append("GSUSynczero")
+    #   self.states.numStoreSgprNameSizes.append(self.states.rpga)
     self.states.numStoreSgprToLoad = storeSgprLoad
 
   ##############################################################################
@@ -7132,7 +7132,7 @@ class KernelWriterAssembly(KernelWriter):
 
     bpe = int(self.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters()) # self.states.bpeCinternal
     module.add(SLShiftLeftB64(dst=sgpr(tmpspgr,2), src=sgpr(tmpspgr,2), shiftHex=log2(bpe), comment="scale by bpe"))
-    
+    module.add(SNop(8))
     module.add(SAddU32(dst=sgpr("SrdTD+0"), \
                                     src0=sgpr("AddressTC+0"), \
                                     src1=sgpr(tmpspgr+0), \
@@ -7425,7 +7425,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   # Store Remap: Local Read and Global Write
   ##############################################################################
-  def storeRemapAddStore(self, kernel, tmpVgpr, tmpS01, edge):
+  def storeRemapAddStore(self, kernel, tmpVgpr, tmpS01, edge, StoreRemapLastBatch):
     module = Module("storeRemapAddStore")
 
     module.add(SWaitCnt(lgkmcnt=0, comment="wait for LDS write"))
@@ -7484,6 +7484,12 @@ class KernelWriterAssembly(KernelWriter):
     vTmp = self.vgprPool.checkOut(1, "SR Store temp addr0")
     addr0 = vgpr(vTmp)
 
+    isGlc = ntStr
+    isSlc = ntStr
+    if kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
+      isGlc = True
+      isSlc = True
+
     if not edge:
       for rIdx, i in enumerate(range(0, nElements, gwvw)):
         if i == 0:
@@ -7500,7 +7506,7 @@ class KernelWriterAssembly(KernelWriter):
 
         numStoreInst += 1
 
-        module.add(self.chooseGlobalWrite(True, bps, storeRegs[rIdx], rpv, addr0, addr1, 0, ntStr, comment="store D StoreRemapVectorWidth"))
+        module.add(self.chooseGlobalWrite(True, bps, storeRegs[rIdx], rpv, addr0, addr1, 0, glc=isGlc, slc=isSlc, comment="store D StoreRemapVectorWidth"))
 
     else:
       tmpS23 = tmpS01+self.states.laneSGPRCount
@@ -7548,9 +7554,9 @@ class KernelWriterAssembly(KernelWriter):
           sumIdx = storeRegs[rIdx] + int(vi*rpe)
           numStoreInst += 1
           if bps == 2:
-            module.add(self.chooseGlobalWrite(True, bpe, sumIdx, rpe, addr0, addr1, 0, ntStr, hi16=vi%2, comment="store D StoreRemapVectorWidth"))
+            module.add(self.chooseGlobalWrite(True, bpe, sumIdx, rpe, addr0, addr1, 0, glc=isGlc, slc=isSlc, hi16=vi%2, comment="store D StoreRemapVectorWidth"))
           else:
-            module.add(self.chooseGlobalWrite(True, bps, sumIdx, rpv, addr0, addr1, 0, ntStr, comment="store D StoreRemapVectorWidth"))
+            module.add(self.chooseGlobalWrite(True, bps, sumIdx, rpv, addr0, addr1, 0, glc=isGlc, slc=isSlc, comment="store D StoreRemapVectorWidth"))
 
           if bps == 1:
             module.add(VAShiftRightI32(dst=vgpr("ValuC+%u"%sumIdx), shiftHex=8, src=vgpr("ValuC+%u"%sumIdx), comment=" shift 1 byte" ))

@@ -1902,6 +1902,82 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx, finalLoop, oddLabel=oddLabel))
     return module
 
+  def GSUSYNCzerocodegen(self, kernel, GSU):
+    module = Module("GSUSYNCzerocodegen")
+    # module.addGSUSYNC("/*\n")
+    module.addComment("zeroingstart")
+    NumZeroingVgpr = 4
+    zeroingVgpr = self.vgprPool.checkOut(NumZeroingVgpr)
+    vaddr = self.vgprPool.checkOut(1)
+    for i in range(NumZeroingVgpr):
+      module.add(VMovB32(dst=vgpr(zeroingVgpr+i), src="0xFFFFFFFF", comment=""))
+    module.add(VMovB32(dst=vgpr(vaddr), src="0x0", comment=""))
+    module.addSpaceLine()
+    print("zeroingVgpr", zeroingVgpr)
+    # print("len(zeroingVgpr)", len(zeroingVgpr))
+
+    tmpSgpr = self.sgprPool.checkOut(1)
+    ZEROINGEND = Label("ZEROINGEND", "")
+
+    module.add(SOrB32(dst=sgpr(tmpSgpr), src0=sgpr("WorkGroup0"), src1=sgpr("WorkGroup1"), comment=""))
+    module.add(SCmpEQU32(src0=sgpr(tmpSgpr), src1=hex(0), comment=""))
+    module.add(SCBranchSCC0(labelName=ZEROINGEND.getLabelName(), comment=""))
+
+    module.add(SCmpEQU32(src0=sgpr("GSUSumIdx"), src1=hex(0), comment=""))
+    module.add(SCBranchSCC0(labelName=ZEROINGEND.getLabelName(), comment="")) 
+    module.addSpaceLine()
+
+    ZEROtmpSgpr = self.sgprPool.checkOut(1)
+    module.add(SMovB32(dst=sgpr(ZEROtmpSgpr), src=GSU, comment=""))
+    ZEROINGLabel = Label("ZEROING", "" )
+    module.add(ZEROINGLabel)
+
+    module.add(SMovB32(sgpr("SrdSync+0"), sgpr("GSUSynczero+0"), "Move GSUSynczero"))
+    module.add(SNop(8))
+    module.add(SMovB32(sgpr("SrdSync+1"), sgpr("GSUSynczero+1"), "Move GSUSynczero"))
+    module.add(SNop(8))
+    module.add(SMovB32(sgpr("SrdSync+2"), sgpr("SrdD+0"), "Move GSUSynczero"))
+    module.add(SNop(8))
+    module.add(SMovB32(sgpr("SrdSync+3"), sgpr("SrdD+1"), "Move GSUSynczero"))
+    module.add(SNop(8))
+
+    addr1 = sgpr("SrdSync", 4)
+    addr0 = vgpr(vaddr)
+    bps = 16
+    rpv = 4
+    for offset in range(0, 25):
+      # module.add(self.chooseGlobalWrite(True, bps, zeroingVgpr, rpv, addr0, addr1, 0, "123", comment="zeroing"))
+      module.add(self.chooseGlobalWrite(True, bps, zeroingVgpr, rpv, addr0, addr1, 4*offset, "123", comment="zeroing"))
+
+    module.add(SSubU32(
+            dst=sgpr(ZEROtmpSgpr), src0=sgpr(ZEROtmpSgpr), \
+            src1=1, \
+            comment=""))
+
+    module.add(SCmpEQI32(
+        src0=sgpr(ZEROtmpSgpr), \
+        src1=hex(0), \
+        comment=""))
+    
+    module.add(SCBranchSCC0(labelName=ZEROINGLabel.getLabelName(), comment=""))
+
+    self.sgprPool.checkIn(ZEROtmpSgpr)
+    self.vgprPool.checkIn(zeroingVgpr)
+    self.vgprPool.checkIn(vaddr)
+    self.sgprPool.checkIn(tmpSgpr)
+    
+
+    module.add(SMovB32(dst=sgpr("GSUSync"), src="0x1", comment=""))
+    module.addGSUSYNC("s_atomic_add s[sgprGSUSync], s[sgprKernArgAddress:sgprKernArgAddress+1], 0x64\n")
+    # module.addGSUSYNC("s_store_dword s[sgprGSUSync], s[sgprKernArgAddress:sgprKernArgAddress+1], 0x8C \n")
+    module.add(SWaitCnt(waitAll=True, comment=""))
+    ZEROINGENDLabel = Label("ZEROINGEND", "" )
+    module.add(ZEROINGENDLabel)
+    module.addComment("zeroingend")
+    
+    # module.addGSUSYNC("*/\n")
+    return module
+
   ##############################################################################
   # Kernel Body
   ##############################################################################
@@ -2004,6 +2080,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if self.states.doShadowInit:
         module.add(self.openShadowInit())
         module.add(self.globalWriteWorkGroupInit(kernel))
+        # if (kernel["GlobalSplitU"] != 1 and kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+        #   module.add(self.GSUSYNCzerocodegen(kernel, kernel["GlobalSplitU"]))
+          # module.add(self.GSUSYNCzero(kernel, kernel["GlobalSplitU"]))
         if self.states.doShadowInit == 2:
           module.add(self.initC(kernel)) # initC while waiting for global reads
           if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
@@ -3456,6 +3535,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     if GSUAMBSK:
       self.defineSgpr("GSUSync", 1)
+      self.defineSgpr("GSUSynczero", 2)
 
     #------------------------
     # Registers defined below this point are not available in the post-loop
@@ -3470,7 +3550,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       (numSgprBeta if kernel["ProblemType"]["UseBeta"] else 0) + \
       self.states.d.numSgprStrides + self.states.c.numSgprStrides + self.states.a.numSgprStrides + self.states.b.numSgprStrides + self.states.m.numSgprStrides + \
       len(kernel["PackedC0IdxChars"][:-1])*2 + len(kernel["PackedC1IdxChars"][:-1])*2 + self.states.numSgprGSU + \
-      (numSgprAddressD if GSUAMBSK == 1 else 0)
+      (numSgprAddressD + 3 if GSUAMBSK == 1 else 0)
     # Get kernel argument end here
     ###################################
 
