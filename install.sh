@@ -661,7 +661,7 @@ pushd .
       install_blis
       popd
 
-      cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON -DLINK_BLIS=${LINK_BLIS} -DBUILD_CLIENTS_BENCHMARKS=ON"
+      cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON -DBUILD_CLIENTS_TESTS=ON -DLINK_BLIS=${LINK_BLIS} -DBUILD_CLIENTS_BENCHMARKS=ON"
 
       #
       # Add matrices_dir if exists.
