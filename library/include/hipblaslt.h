@@ -388,7 +388,7 @@ hipblasStatus_t hipblasLtGetArchName(char** archName);
  *  \retval HIPBLAS_STATUS_INVALID_VALUE \p handle == NULL.
  */
 HIPBLASLT_EXPORT
-hipblasStatus_t hipblasLtCreate(hipblasLtHandle_t* handle, hipStream_t stream = NULL);
+hipblasStatus_t hipblasLtCreate(hipblasLtHandle_t* handle);
 
 /*! \ingroup library_module
  *  \brief Destory a hipblaslt handle
@@ -411,7 +411,7 @@ hipblasStatus_t hipblasLtCreate(hipblasLtHandle_t* handle, hipStream_t stream = 
  * not initialized. \retval HIPBLAS_STATUS_INVALID_VALUE \p handle == NULL.
  */
 HIPBLASLT_EXPORT
-hipblasStatus_t hipblasLtDestroy(const hipblasLtHandle_t handle, hipStream_t stream = NULL);
+hipblasStatus_t hipblasLtDestroy(const hipblasLtHandle_t handle);
 
 /*! \ingroup library_module
  *  \brief Create a matrix layout descriptor

@@ -36,8 +36,8 @@ int main()
     static_cast<void>(hipStreamBeginCapture(stream, mode));
 
     hipblasLtHandle_t handle;
-    static_cast<void>(hipblasLtCreate(&handle, stream));
-    static_cast<void>(hipblasLtDestroy(handle, stream));
+    static_cast<void>(hipblasLtCreate(&handle));
+    static_cast<void>(hipblasLtDestroy(handle));
 
     hipGraph_t graph = NULL;
     static_cast<void>(hipStreamEndCapture(stream, &graph));
