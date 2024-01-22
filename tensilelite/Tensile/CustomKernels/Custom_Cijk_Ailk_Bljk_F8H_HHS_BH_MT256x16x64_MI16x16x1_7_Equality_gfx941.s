@@ -15,7 +15,7 @@
   .amdhsa_accum_offset 256 // accvgpr offset
   .amdhsa_next_free_vgpr 272 // vgprs
   .amdhsa_next_free_sgpr 77 // sgprs
-  .amdhsa_group_segment_fixed_size 39414 // lds bytes
+  .amdhsa_group_segment_fixed_size 39424 // lds bytes
   .amdhsa_private_segment_fixed_size 0
   .amdhsa_system_sgpr_workgroup_id_x 1
   .amdhsa_system_sgpr_workgroup_id_y 1
@@ -178,7 +178,7 @@ amdhsa.kernels:
         .offset:          108
         .value_kind:      by_value
         .value_type:      u32
-    .group_segment_fixed_size:   39414
+    .group_segment_fixed_size:   39424
     .kernarg_segment_align:      8
     .kernarg_segment_size:       112
     .max_flat_workgroup_size:    256

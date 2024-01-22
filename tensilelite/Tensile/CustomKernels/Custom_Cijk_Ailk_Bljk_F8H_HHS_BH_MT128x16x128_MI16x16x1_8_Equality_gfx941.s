@@ -379,7 +379,7 @@ Custom_Cijk_Ailk_Bljk_F8H_HHS_BH_MT128x16x128_MI16x16x1_8_Equality_gfx941:
 .long 0x9249882C
 .long 0x924A8C2C
 .long 0x924B902C
-.long 0x924C941C
+.long 0x924C942C
 .long 0x924D982C
 .long 0x924E9C2C
 .long 0xD2850006, 0x0002042E
