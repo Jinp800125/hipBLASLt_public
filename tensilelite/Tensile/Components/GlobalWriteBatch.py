@@ -199,14 +199,14 @@ class GlobalWriteBatchWriter:
 
     tmpS01 = self.parentWriter.sgprPool.checkOut(1, preventOverflow=False) #overflow?
     tmpS03 = self.parentWriter.sgprPool.checkOut(1, preventOverflow=False) #overflow?
-    module.add(SSubU32(dst=sgpr("GSUSync"), src0=sgpr("GSU"), src1=hex(1), comment=""))
+    # module.add(SSubU32(dst=sgpr("GSUSync"), src0=sgpr("GSU"), src1=hex(1), comment=""))
     module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr("NumWorkGroups1"), src1=sgpr("NumWorkGroups0"), comment=""))
     module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr(tmpS03), src1=sgpr("WorkGroup2"), comment=""))
     module.add(SMulI32(dst=sgpr(tmpS01), src0=sgpr("WorkGroup1"), src1=sgpr("NumWorkGroups0"), comment=""))
     module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=sgpr("WorkGroup0")))
     module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=sgpr(tmpS03)))
 
-    tmpV01 = self.parentWriter.vgprPool.checkOut(1)
+    # tmpV01 = self.parentWriter.vgprPool.checkOut(1)
     module.add(SLShiftRightB32(dst=sgpr(tmpS02), shiftHex=hex(log2(self.kernel["WavefrontSize"])), src=sgpr(tmpS02)))
 
     module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr("NumWorkGroups0"), src1=sgpr("NumWorkGroups1"), comment="cal a wave offset"))
@@ -352,7 +352,7 @@ class GlobalWriteBatchWriter:
       Synchronizerlabel = Label(self.parentWriter.labels.getNameInc(SynchronizerlabelString), SynchronizerComment)
 
 
-      tmpVAdd = self.parentWriter.vgprPool.checkOutAligned((GSUtotal)*4*self.kernel["VectorWidthA"], 4)
+      tmpVAdd = self.parentWriter.vgprPool.checkOutAligned((GSUtotal-1)*4*self.kernel["VectorWidthA"], 4)
       GSUP1 = GSUtotal-1
 
       for i in range(0,GSUP1):
@@ -376,7 +376,8 @@ class GlobalWriteBatchWriter:
 
         SyncloadedData += 1
       module.addComment("buffer load end\n")
-
+      module.addComment(str(tmpVAdd))
+      module.addComment(str((GSUtotal-1)*4*self.kernel["VectorWidthA"]))
       #####################################> GSUtotal reduction start#####################################
       module.addComment("buffer add start")
       vscnt = 0
@@ -441,7 +442,7 @@ class GlobalWriteBatchWriter:
         module.addSpaceLine()
         module.add(SynchronizerAddEndlabel[k])
 
-        module.add(SMovB32(dst=sgpr("GSUSync"), src=sgpr("GSU"), comment=""))
+        # module.add(SMovB32(dst=sgpr("GSUSync"), src=sgpr("GSU"), comment=""))
         vmcnt = k
         for i in range(0, k):
           module.addSpaceLine()
@@ -457,9 +458,11 @@ class GlobalWriteBatchWriter:
               module.add(VAddPKF32(dst=vgpr(vgprstart+j*2, 2), src0=vgpr(vgprstart+j*2, 2), \
                                 src1=vgpr(tmpVAdd+0+4*i*self.kernel["VectorWidthA"]+j*2, 2), comment="buffer pk"))
 
-          module.add(SSubI32(dst=sgpr("GSUSync"), src0=sgpr("GSUSync"), src1=1, comment="%u" % i))
-          module.add(SCmpEQI32(src0=sgpr("GSUSync"), src1=1, comment=""))#GSUSync+GSUP1==GSU
-          module.add(SCBranchSCC1(labelName=SynchronizerAddSkiplabel.getLabelName(), comment="SyncAddbranch"))
+          # module.add(SSubI32(dst=sgpr("GSUSync"), src0=sgpr("GSUSync"), src1=1, comment="%u" % i))
+          # module.add(SCmpEQI32(src0=sgpr("GSUSync"), src1=1, comment=""))#GSUSync+GSUP1==GSU
+          # module.add(SCBranchSCC1(labelName=SynchronizerAddSkiplabel.getLabelName(), comment="SyncAddbranch"))
+          if i == k-1:
+            module.add(SBranch(labelName=SynchronizerAddSkiplabel.getLabelName(), comment="SyncAddbranch"))
 
       module.add(SynchronizerAddSkiplabel)
 
@@ -473,7 +476,7 @@ class GlobalWriteBatchWriter:
     self.parentWriter.sgprPool.checkIn(tmpS04)
     self.parentWriter.sgprPool.checkIn(tmpS03)
     self.parentWriter.sgprPool.checkIn(tmpS02)
-    self.parentWriter.vgprPool.checkIn(tmpV01)
+    # self.parentWriter.vgprPool.checkIn(tmpV01)
     self.parentWriter.sgprPool.checkIn(tmpS01)
 
     return module

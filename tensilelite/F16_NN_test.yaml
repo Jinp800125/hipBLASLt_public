@@ -104,7 +104,7 @@ BenchmarkProblems:
         - 1LDSBuffer: [0]
         # - OptNoLoadLoop: [0]
         # - GlobalSplitU: [4]
-        - GlobalSplitU: [1,2,19]
+        - GlobalSplitU: [1,2,8,19]
         - GlobalSplitUAlgorithm: ["MultipleBufferSingleKernel"]
         # - GlobalSplitUAlgorithm: ["MultipleBufferSingleKernel", "MultipleBuffer"]
         # - GlobalSplitUAlgorithm: ["MultipleBuffer"]
