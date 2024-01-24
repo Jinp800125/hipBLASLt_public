@@ -195,27 +195,28 @@ class GlobalWriteBatchWriter:
     module.addComment("synchronizer offset cal")
 
     tmpS02 = self.parentWriter.sgprPool.checkOut(1, preventOverflow=False) #overflow?
-    module.add(VReadfirstlaneB32(dst=sgpr(tmpS02), src=vgpr("Serial")))
+    
 
     tmpS01 = self.parentWriter.sgprPool.checkOut(1, preventOverflow=False) #overflow?
     tmpS03 = self.parentWriter.sgprPool.checkOut(1, preventOverflow=False) #overflow?
     # module.add(SSubU32(dst=sgpr("GSUSync"), src0=sgpr("GSU"), src1=hex(1), comment=""))
     module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr("NumWorkGroups1"), src1=sgpr("NumWorkGroups0"), comment=""))
-    module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr(tmpS03), src1=sgpr("WorkGroup2"), comment=""))
+    module.add(SMulI32(dst=sgpr(tmpS02), src0=sgpr(tmpS03), src1=sgpr("WorkGroup2"), comment=""))
     module.add(SMulI32(dst=sgpr(tmpS01), src0=sgpr("WorkGroup1"), src1=sgpr("NumWorkGroups0"), comment=""))
     module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=sgpr("WorkGroup0")))
-    module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=sgpr(tmpS03)))
+    module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=sgpr(tmpS02)))
 
-    # tmpV01 = self.parentWriter.vgprPool.checkOut(1)
-    module.add(SLShiftRightB32(dst=sgpr(tmpS02), shiftHex=hex(log2(self.kernel["WavefrontSize"])), src=sgpr(tmpS02)))
+    module.add(VReadfirstlaneB32(dst=sgpr(tmpS02), src=vgpr("Serial")))
 
-    module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr("NumWorkGroups0"), src1=sgpr("NumWorkGroups1"), comment="cal a wave offset"))
+    #module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr("NumWorkGroups0"), src1=sgpr("NumWorkGroups1"), comment="cal a wave offset"))
     module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr(tmpS03), src1=sgpr("SizeK"), comment="cal a wave offset"))
+    module.add(SLShiftRightB32(dst=sgpr(tmpS02), shiftHex=hex(log2(self.kernel["WavefrontSize"])), src=sgpr(tmpS02)))
     module.add(SMulI32(dst=sgpr(tmpS02), src0=sgpr(tmpS03), src1=sgpr(tmpS02), comment="wave offset at batch")) # WaveId*WgNum
-    module.add(SAddU32(dst=sgpr(tmpS02), src0=sgpr(tmpS02), src1=sgpr(tmpS01))) # WaveId*WgNum+WgId
-    module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr(tmpS03), src1=int(WaveNum), comment="cal a batch offset")) # WgNum*WaveNum
-    module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr(tmpS03), src1=self.batchIdx, comment="this batch offset")) # WgNum*WaveNum*Batch
-    module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS02), src1=sgpr(tmpS03))) # WaveId*WgNum+WgId + WgNum*WaveNum*Batch
+    module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS02), src1=sgpr(tmpS01))) # WaveId*WgNum+WgId
+    if self.batchIdx > 0:
+      module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr(tmpS03), src1=int(WaveNum), comment="cal a batch offset")) # WgNum*WaveNum
+      module.add(SMulI32(dst=sgpr(tmpS03), src0=sgpr(tmpS03), src1=self.batchIdx, comment="this batch offset")) # WgNum*WaveNum*Batch
+      module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=sgpr(tmpS03))) # WaveId*WgNum+WgId + WgNum*WaveNum*Batch
     module.add(SLShiftLeftB32(dst=sgpr(tmpS01), src=sgpr(tmpS01), shiftHex=hex(2), comment="")) # atomic 32bits
     #####################################set synchronizer
     module.add(SAddU32(dst=sgpr("SrdSync+0"), \
@@ -254,45 +255,25 @@ class GlobalWriteBatchWriter:
 
     module.addSpaceLine()
     #####################################cal synchronizer sum start#####################################
-    module.add(SMulI32(dst=sgpr(tmpS05+1), src0=sgpr("GSUSumIdx"), src1=sgpr(tmpS04+1), comment=""))
-    module.add(SMulHIU32(dst=sgpr(tmpS01), src0=sgpr("GSUSumIdx"), src1=sgpr(tmpS04+0), comment=""))
-    module.add(SMulI32(dst=sgpr(tmpS05+0), src0=sgpr("GSUSumIdx"), src1=sgpr(tmpS04+0), comment=""))
-    module.add(SAddU32(dst=sgpr(tmpS05+1), \
-                                    src0=sgpr(tmpS05+1), \
-                                    src1=sgpr(tmpS01), \
-                                    comment="" ))
-
-    tmpS06 = self.parentWriter.sgprPool.checkOutAligned(4,4, preventOverflow=False) #overflow?
-    module.add(SSubU32(dst=sgpr(tmpS06+0), \
-                                    src0=sgpr("SrdD+0"), \
-                                    src1=sgpr(tmpS05+0), \
-                                    comment="" ))
-    module.add(SSubBU32(dst=sgpr(tmpS06+1), \
-                        src0=sgpr("SrdD+1"), \
-                        src1=sgpr(tmpS05+1), \
-                        comment="" ))
-
-    module.add(SMovB32(sgpr(tmpS06+2), sgpr("SrdD+2"), "Move HELLO"))
-    module.add(SMovB32(sgpr(tmpS06+3), sgpr("SrdD+3"), "Move HELLO"))
-    module.addSpaceLine()
+    # no need to do because we have workspace start sgpr
     #####################################check synchronizer done#####################################
+    checkSyncCode = Module("check synchronizer done")
+    checkSyncCode.addComment("check synchronizer done")
 
-    module.addComment("check synchronizer done")
-
-    module.add(SWaitCnt(lgkmcnt=0, comment="Wait for synchronizer"))
-    module.add(SCmpEQU32(
+    checkSyncCode.add(SWaitCnt(lgkmcnt=0, comment="Wait for synchronizer"))
+    checkSyncCode.add(SCmpEQU32(
         src0=sgpr(tmpS02), \
         src1=hex(1), \
         comment=""))
-    module.add(SCBranchSCC0(labelName=labelendname, comment=""))
+    checkSyncCode.add(SCBranchSCC0(labelName=labelendname, comment=""))
 
-    module.addComment("check done end")
-    module.addSpaceLine()
+    checkSyncCode.addComment("check done end")
+    checkSyncCode.addSpaceLine()
     #####################################load buffer#####################################
-    module.addComment("buffer load start")
-
+    checkSyncCode.addComment("buffer load start")
     SyncloadedData = 0
 
+    tmpS06 = self.parentWriter.sgprPool.checkOutAligned(4,4, preventOverflow=False) #overflow?
     addr1 = sgpr(tmpS06, 4)
     addr0 = vgpr(vgproffset)
     bps = self.kernel["ProblemType"]["ComputeDataType"].numBytes() * self.gwvw
@@ -324,6 +305,10 @@ class GlobalWriteBatchWriter:
       module.add(SMovB32(sgpr(tmpS06+1), sgpr("WSDstart+1"), "Move workspace start"))
       module.add(SMovB32(sgpr(tmpS06+2), sgpr("SrdD+2"), ""))
       module.add(SMovB32(sgpr(tmpS06+3), sgpr("SrdD+3"), ""))
+
+      if elementIdx == 0:
+        # Insert check synchronizer done code here for better scheduling
+        module.add(checkSyncCode)
 
       for times in range(elementIdx, elementIdx+1):
         addrCalctmp: AddrCalculation = self.ss.elementAddr[times]
@@ -476,7 +461,6 @@ class GlobalWriteBatchWriter:
     self.parentWriter.sgprPool.checkIn(tmpS04)
     self.parentWriter.sgprPool.checkIn(tmpS03)
     self.parentWriter.sgprPool.checkIn(tmpS02)
-    # self.parentWriter.vgprPool.checkIn(tmpV01)
     self.parentWriter.sgprPool.checkIn(tmpS01)
 
     return module
