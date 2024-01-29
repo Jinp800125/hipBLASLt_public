@@ -1882,7 +1882,11 @@ class Solution(collections.abc.Mapping):
         state["_GlobalAccumulation"] = 'SingleBuffer'
     elif state["GlobalSplitUAlgorithm"] == 'MultipleBuffer':
       state["_GlobalAccumulation"] = 'MultipleBuffer'
-    elif state["GlobalSplitU"] > 1 and state["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel':
+    elif state["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel':
+      if (not globalParameters["SplitGSU"]):
+        state["_GlobalAccumulation"] = 'MultipleBufferSingleKernel'
+      else:
+        if state["GlobalSplitU"] > 1:
           state["_GlobalAccumulation"] = 'MultipleBufferSingleKernel'
 
     if state["GlobalSplitUAlgorithm"] == 'SingleBuffer':
@@ -3198,7 +3202,7 @@ class Solution(collections.abc.Mapping):
       if not state["EnableMatrixInstruction"]:
         reject(state, "storeRemap only support MatrixInstruction kernel")
         return
-      if (state["GlobalSplitU"] > 1) and (state["_GlobalAccumulation"] != 'MultipleBuffer' and state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel'):
+      if (state["GlobalSplitU"] > 1) and (state["_GlobalAccumulation"] != 'MultipleBuffer' or state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel'):
         reject(state, "storeRemap doesn't support GlobalSplitU yet, except GSU algorithm 2")
         return
       if packedC0 or packedC1:
@@ -3533,6 +3537,11 @@ class Solution(collections.abc.Mapping):
     if state["GlobalSplitU"] > 1:
       if state["ProblemType"]["SupportUserArgs"] and state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel':
         reject(state, "Currently SupportUserArgs does not support GSU > 1.")
+    if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel' and (state["NumElementsPerBatchStore"] == 1):
+      reject(state, "MultipleBufferSingleKernel does not support NumElementsPerBatchStore=1.")
+    if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+      if (state["MIWaveTile"][0]*state["MIWaveTile"][1]>4) and (state["MIWaveGroup"][0]==2 and state["MIWaveGroup"][1]==2):
+        reject(state, "Occupancy limit!! overflowed resources MultipleBufferSingleKernel does not support")
 
     #Need to force disabling PreloadKernArgs if compiler does not support
     #Can not just reject the solution since the user library may find any solutions
@@ -3610,7 +3619,7 @@ class Solution(collections.abc.Mapping):
     state_copy = deepcopy(state)
 
     if globalParameters["SplitGSU"]:
-      state_copy["GlobalSplitU"] = "M" if (state_copy["GlobalSplitU"] > 1 and state["GlobalSplitUAlgorithm"] != 'MultipleBufferSingleKernel') else state_copy["GlobalSplitU"]
+      state_copy["GlobalSplitU"] = "M" if (state_copy["GlobalSplitU"] > 1) else state_copy["GlobalSplitU"]
     else:
       state_copy["GlobalSplitU"] = "M"
     state_copy["WorkGroupMapping"] = "M"
@@ -3656,7 +3665,7 @@ class Solution(collections.abc.Mapping):
 
     if ignoreInternalArgs:
       if globalParameters["SplitGSU"]:
-        state["GlobalSplitU"] = "M" if (state["GlobalSplitU"] > 1 and state["GlobalSplitUAlgorithm"] != 'MultipleBufferSingleKernel') else state["GlobalSplitU"]
+        state["GlobalSplitU"] = "M" if (state["GlobalSplitU"] > 1) else state["GlobalSplitU"]
       else:
         requiredParameters["GlobalSplitU"] = False
       requiredParameters["WorkGroupMapping"] = False

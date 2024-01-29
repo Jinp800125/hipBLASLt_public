@@ -225,6 +225,9 @@ class StateValues:
   numStoreSgprNames: List[str]           = field(init=False) # For post-loop kernel args
   numStoreSgprNameSizes: List[int]       = field(init=False) # For post-loop kernel args
   numStoreSgprToLoad: int                = 0 # For post-loop kernel args
+  numStoreSgprNames2: List[str]           = field(init=False) # For post-loop kernel args
+  numStoreSgprNameSizes2: List[int]       = field(init=False) # For post-loop kernel args
+  numStoreSgprToLoad2: int                = 0 # For post-loop kernel args
   numStoreSgprInst: int                  = 0 # For pose-loop kernel args
   numStoreSgprInstExt: int               = 0 # For pose-loop kernel args
   numSgprAddressBias: int                = 0
@@ -2239,8 +2242,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
         gsuBackup          = kernel["GlobalSplitU"]
         gsuAccumBackup     = kernel["_GlobalAccumulation"]
         bpeCexternalBackup = self.states.bpeCexternal
+
         kernel["GlobalSplitU"] = 1
         kernel["_GlobalAccumulation"] = None
+
         self.states.bpeCexternal = self.states.bpeCexternalGSU1
         if kernel["KernelLanguage"] == "Assembly" and kernel["OptNoLoadLoop"] and \
            kernel["BufferLoad"] and kernel["BufferStore"] and self.states.doShadowInit and \
@@ -2528,6 +2533,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     moduleKernelBody.addBody(module)
     self.checkResources(moduleKernelBody)
+
+    # print("kernel debug")
+    # print(moduleKernelBody)
+    # print(module)
 
     # Tensile instruction pass, temporarily disable due to build time.
     # Kernels with epilog especially with activation is too long (50000~ lines).
@@ -3576,6 +3585,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("NumWorkGroups0", 1)
     self.defineSgpr("NumWorkGroups1", 1)
 
+    if self.states.doShadowInit and kernel["BufferStore"] and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+      self.defineSgpr("SrdSync", 4, 4)
+      self.defineSgpr("WSDstart", 2)
     ###################################
     # Get kernel argument start here
     ###################################
@@ -3615,6 +3627,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
     for idxChar in kernel["PackedC1IdxChars"][:-1]:
       self.defineSgpr("MagicNumberSize%s"%idxChar, 1)
       self.defineSgpr("MagicShiftSize%s"%idxChar, 1)
+
+    GSUAMBSK = 0
+    if (kernel["GlobalSplitU"] > 1) and (kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel'):
+      GSUAMBSK = 1
+
     self.defineSgpr("Alpha", numSgprAlpha, numSgprAlpha)
     self.states.numSgprAlpha = numSgprAlpha
     if kernel["ProblemType"]["UseBeta"]:
@@ -3635,6 +3652,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # Workgroup ID x, y, z need 3 sgprs
       numWorkgroupIDSgpr = kernel["ProblemType"]["NumIndicesC"]
       self.states.numSgprPreload = 16 - self.states.rpga - kernel["ProblemType"]["NumIndicesC"]
+
+    if kernel["ProblemType"]["GroupedGemm"]:
+      if GSUAMBSK:
+        self.defineSgpr("GSUSync", 1)
+        self.defineSgpr("AddressTC", numSgprAddressD)
+        self.defineSgpr("Synchronizer", 2)
 
     #------------------------
     # Registers defined below this point are not available in the post-loop

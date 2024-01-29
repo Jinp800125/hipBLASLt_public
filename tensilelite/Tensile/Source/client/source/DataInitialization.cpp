@@ -820,6 +820,10 @@ namespace Tensile
                 {
                     m_vdata[i].init = args[initName].as<InitMode>();
                 }
+                else if(m_vdata[i].name == "Synchronizer")
+                {
+                    m_vdata[i].init = InitMode::Zero;
+                }
                 else
                 {
                     m_vdata[i].init = InitMode::Zero;
@@ -1623,6 +1627,7 @@ namespace Tensile
             inputs->scaleD        = (void*)ptrs[ContractionProblemGemm::TENSOR::SCALED];
             inputs->scaleAlphaVec = (void*)ptrs[ContractionProblemGemm::TENSOR::SCALEALPHAVEC];
             inputs->metadata      = (unsigned char*)ptrs[ContractionProblemGemm::TENSOR::METADATA];
+            inputs->Synchronizer = (void*)ptrs[ContractionProblemGemm::TENSOR::Synchronizer];
 
             inputs->batchA    = (void**)batchPtrs[ContractionProblemGemm::TENSOR::A];
             inputs->batchB    = (void**)batchPtrs[ContractionProblemGemm::TENSOR::B];
@@ -1732,6 +1737,13 @@ namespace Tensile
                     u8Ptr[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
                         += offsets[ContractionProblemGemm::TENSOR::SCALEALPHAVEC][idx]
                            * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
+                                 .elementBytes();
+                }
+                if(u8Ptr[ContractionProblemGemm::TENSOR::Synchronizer] != nullptr)
+                {
+                    u8Ptr[ContractionProblemGemm::TENSOR::Synchronizer]
+                        += offsets[ContractionProblemGemm::TENSOR::Synchronizer][idx]
+                           * problem.tensors()[ContractionProblemGemm::TENSOR::Synchronizer]
                                  .elementBytes();
                 }
             }

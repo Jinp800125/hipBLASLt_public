@@ -127,6 +127,7 @@ namespace Tensile
                     size_t ws      = solution.requiredWorkspaceSizeGroupedGemm(problems->gemms);
                     auto&  problem = problems->gemms[idx];
                     problem.setWorkspaceSizeGroupedGemm(ws);
+                    problem.setGroupedGemmCount(problems->gemms.size());
                     if(!checkSolution(solution, problem))
                         return false;
                 }
