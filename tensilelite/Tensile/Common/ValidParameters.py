@@ -580,6 +580,8 @@ validParameters = { # we need to make sure this matches develop
     "StoreRemapVectorWidth": [-1, 0, 1, 2, 4, 8],
     # SourceSwap: Optimizes MatrixInstruction store pattern by swapping mfma input order.
     "SourceSwap": [False, True],
+    # Swizzle L1 Cache
+     "L1CacheSwizzle": [True, False],
     # Following parameters are designed for store scheduling.
     # (store stands for load from C (with beta) and store to C/D)
     #

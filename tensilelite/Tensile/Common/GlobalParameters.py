@@ -377,6 +377,7 @@ defaultBenchmarkCommonParameters = [
     {"GlobalSplitUCoalesced": [False]},
     {"GlobalSplitUWorkGroupMappingRoundRobin": [False]},
     {"LocalSplitU": [ 1 ] },
+    {"L1CacheSwizzle": [ False ] },
     {"Use64bShadowLimit": [1]},
     {"NumLoadsCoalescedA": [1]},
     {"NumLoadsCoalescedB": [1]},

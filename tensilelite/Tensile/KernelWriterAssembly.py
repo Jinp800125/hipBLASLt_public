@@ -3606,6 +3606,9 @@ class KernelWriterAssembly(KernelWriter):
             shiftHex="BpeGR%sLog2"%tc,
             comment="<- scale by bpeDS"))
 
+    if kernel["L1CacheSwizzle"]:
+      module.add(SOrB32(dst=sgpr("Srd%s+1"%tc), src0=sgpr("Srd%s+1"%tc), src1="0x40000000"))
+
     return Module("graIncrements (Empty)") if self.dontAppendCode else module
 
   ##############################################################################

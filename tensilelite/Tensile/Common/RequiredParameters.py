@@ -52,6 +52,7 @@ def getRequiredParametersMin() -> set:
         'ISA',
         'InnerUnroll',
         'Kernel',
+        'L1CacheSwizzle',
         'LdsBlockSizePerPadA',
         'LdsBlockSizePerPadB',
         'LdsBlockSizePerPadMetadata',
