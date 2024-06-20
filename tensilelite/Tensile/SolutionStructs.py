@@ -2416,7 +2416,19 @@ class Solution(collections.abc.Mapping):
         padA, padB = calcLdsPad(state["LocalReadVectorWidth"])
         ldsBlockSizePerPadA, ldsBlockSizePerPadB = calcLdsBlockSizePerPad(state["LocalReadVectorWidth"])
         ldsNumBytesA, ldsNumBytesAlignedA, ldsNumBytesB, ldsNumBytesAlignedB = calcLdsNumBytes(padA, ldsBlockSizePerPadA, padB, ldsBlockSizePerPadB)
-        if (ldsNumBytesAlignedA + ldsNumBytesAlignedB) > globalParameters["MaxLDS"]:
+        # print("ldsNumBytesAlignedA", ldsNumBytesAlignedA)
+        # print("ldsNumBytesAlignedB", ldsNumBytesAlignedB)
+        # print("globalParameters[MaxLDS]", globalParameters["MaxLDS"])
+        # if (ldsNumBytesAlignedA + ldsNumBytesAlignedB) > globalParameters["MaxLDS"]:
+        if ldsBlockSizePerPadA == 0:
+          ldsBlockSizePerPadA = 1
+        if ldsBlockSizePerPadB == 0:
+          ldsBlockSizePerPadB = 1
+        if (state["MacroTile0"] * state["_DepthUA"] * state["ProblemType"]["DataType"].numBytes() * \
+            ((ldsBlockSizePerPadA + padA * state["ProblemType"]["DataType"].numBytes()) / ldsBlockSizePerPadA) + \
+            state["MacroTile1"] * state["_DepthUB"] * state["ProblemType"]["DataType"].numBytes() * \
+            ((ldsBlockSizePerPadB + padB * state["ProblemType"]["DataType"].numBytes()) / ldsBlockSizePerPadB)) \
+            > globalParameters["MaxLDS"]:
           state["LocalReadVectorWidth"] //= 2
 
     if state["ConvertAfterDS"]:
@@ -3182,6 +3194,8 @@ class Solution(collections.abc.Mapping):
       state["LdsOffsetMetadata"] = state["LdsOffsetB"] + ldsNumBytesAlignedB
       ldsNumBytesAB = ldsNumBytesAlignedA + ldsNumBytesAlignedB + ldsNumBytesMetadata
 
+    # print("ldsNumBytes", ldsNumBytesAB, ldsNumBytesAlignedA, ldsNumBytesAlignedB, ldsNumBytesMetadata)
+
     # lds size is the greater of the two
     ldsNumBytes = max(ldsNumBytesAB, ldsNumBytesReduction, ldsNumBytesOccupancy)
 
@@ -3361,6 +3375,7 @@ class Solution(collections.abc.Mapping):
           return
 
       ldsNumBytes = max(ldsNumBytes, ldsNumBytesRemapC)
+      # print("ldsNumBytes1", ldsNumBytes)
 
     state["LdsOffsetBias"] = 0  # TODO: ldsBiasOffset = ldsNumBytesAB
     state["LdsOffsetBiasNonGSU"] = 0
@@ -3390,6 +3405,7 @@ class Solution(collections.abc.Mapping):
         for dataType in state["ProblemType"]["BiasDataTypeList"]:
           ldsBiasMaxElements = max(ldsBiasMaxElements, state["MacroTile0"] * dataType.numBytes())
       ldsNumBytes = max(ldsNumBytes, state["LdsOffsetBias"] + ldsBiasMaxElements)
+      # print("ldsNumBytes2", ldsNumBytes)
 
     state["LdsNumBytes"] = ldsNumBytes
     ldsSize = ldsNumBytes
