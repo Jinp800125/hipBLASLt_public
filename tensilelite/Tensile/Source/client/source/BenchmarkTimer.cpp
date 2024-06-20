@@ -212,9 +212,13 @@ namespace Tensile
                         "[BenchmarkTimer] Failed to cast problem to any ContractionProblem.");
                 }
                 size_t flopsInProblem = flopCount;
+                // std::cout << "m_minFlopsPerSync: " << m_minFlopsPerSync << std::endl;
+                // std::cout << "flopsInProblem: " << flopsInProblem << std::endl;
                 enqueuesByFlops       = CeilDivide(m_minFlopsPerSync, flopsInProblem);
             }
-
+            // std::cout << "m_numEnqueuesPerSync: " << m_numEnqueuesPerSync << std::endl;
+            // std::cout << "enqueuesByFlops: " << enqueuesByFlops << std::endl;
+            // std::cout << "m_maxEnqueuesPerSync: " << m_maxEnqueuesPerSync << std::endl;
             return std::min<size_t>(std::max<size_t>(m_numEnqueuesPerSync, enqueuesByFlops),
                                     m_maxEnqueuesPerSync);
         }

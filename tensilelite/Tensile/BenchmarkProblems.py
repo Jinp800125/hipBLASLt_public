@@ -57,6 +57,7 @@ def generateForkedSolutions(problemType, constantParams, forkPermutations):
 
         # TODO check if solution matches problem size for exact tile kernels
         solutionObject = Solution(solution)
+        # print("solutionObject", solutionObject)
         if solutionObject["Valid"]:
             if solutionObject not in solutionSet:
                 solutionSet.add(solutionObject)
@@ -275,6 +276,8 @@ def benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSizeG
             kcSolutions = generateCustomKernelSolutions(benchmarkProcess.problemType, \
                     benchmarkStep.customKernels, benchmarkStep.internalSupportParams, \
                     not benchmarkStep.customKernelWildcard)
+
+            print("regSolutions + kcSolutions: ", len(regSolutions), len(kcSolutions))    
 
             maxPossibleSolutions += len(kcSolutions)
             solutions = regSolutions + kcSolutions

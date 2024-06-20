@@ -122,8 +122,16 @@ public:
             {
                 if(norm1 != ArgumentLogging::NA_value)
                 {
-                    name_line << ",norm_error_1";
-                    val_line << "," << norm1;
+                    if (norm1 > 0.001)
+                    {
+                        name_line << ",norm_error_1_fail";
+                        val_line << "," << norm1;
+                    }
+                    else
+                    {
+                        name_line << ",norm_error_1_pass";
+                        val_line << "," << norm1;
+                    }
                 }
                 if(norm2 != ArgumentLogging::NA_value)
                 {

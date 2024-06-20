@@ -1082,7 +1082,8 @@ class Solution(collections.abc.Mapping):
       self["AssignedDerivedParameters"] = False
 
     Solution.assignDerivedParameters(self._state)
-    self._name = config["CustomKernelName"] if isCustomKernelConfig(config) else None
+    # self._name = config["CustomKernelName"] if isCustomKernelConfig(config) else None
+    self._name = config["CustomKernelName"]+"_"+str(config["WorkGroupMapping"]) if isCustomKernelConfig(config) else None
     self.initHelperKernelObjects()
 
   # these keys are copied from ProblemType to internal that may be overridden
@@ -2372,6 +2373,9 @@ class Solution(collections.abc.Mapping):
       if padInterval != 0:
         ldsNumBytesA = int((state["_DepthUA"] * state["MacroTileA"] * bpeA) / padInterval * (padInterval + state["LdsPadA"] * bpeA))
       ldsNumBytesAlignedA = roundUpToNearestMultiple(ldsNumBytesA, ldsAlign)
+
+      if state["CustomKernelName"] != "":
+        ldsNumBytesAlignedA = 0
 
       if state["UnrollMajorLDSB"]:
         ldsNumBytesB = (state["_DepthUB"] + ldsPadB) * state["MacroTileB"] * bpeB
@@ -3721,7 +3725,7 @@ class Solution(collections.abc.Mapping):
     return state_copy
 
   @ staticmethod
-  def getNameFull(state):
+  def getNameFull(state, flag=1):
     requiredParameters = {}
     for key in state:
       if key in list(validParameters.keys()):
@@ -3730,13 +3734,13 @@ class Solution(collections.abc.Mapping):
       # Use MIWaveGroup and MIWaveTile instead of WG and MT
       requiredParameters["MIWaveTile"]  = True
       requiredParameters["ThreadTile"]  = False
-    return Solution.getNameMin(state, requiredParameters)
+    return Solution.getNameMin(state, requiredParameters, flag=flag)
 
   ########################################
   # Get Name Min
   @ staticmethod
-  def getNameMin(state, requiredParameters, ignoreInternalArgs = False):
-    if isCustomKernelConfig(state):
+  def getNameMin(state, requiredParameters, ignoreInternalArgs = False, flag=1):
+    if isCustomKernelConfig(state) and flag:
       return state["CustomKernelName"]
 
     components = []
@@ -3916,8 +3920,11 @@ class Solution(collections.abc.Mapping):
     self._state[key] = value
 
   def __str__(self):
+    # print("self._name b: ", self._name)
     if self._name is None:
       self._name = Solution.getNameFull(self._state)
+
+    # print("self._name a: ", self._name)
     return self._name
 
   def __repr__(self):

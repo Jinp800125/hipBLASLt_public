@@ -66,7 +66,6 @@ custom.config:
    ScheduleIterAlg: 3
    DepthU: 64
    StaggerU: 8
-   WorkGroupMapping: 8
    GlobalReadVectorWidthA: 8
    GlobalReadVectorWidthB: 8
    AssertFree0ElementMultiple: 1
