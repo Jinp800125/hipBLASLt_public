@@ -3640,7 +3640,14 @@ class Solution(collections.abc.Mapping):
     #   if state["ProblemType"]["SupportUserArgs"] and state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel':
     #     reject(state, "Currently SupportUserArgs does not support GSU > 1.")
 
+    # if (state["DepthU"] > 128 and (state["MacroTile0"] or state["MacroTile1"] > 128)):
+    #   reject(state, "MacroTile > DepthU(128) acc tunning")
+
     if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+      # if (state["MacroTile0"] > 64 and state["MacroTile1"] > 64):
+      #   reject(state, "MacroTile > (64), acc tunning")
+      # if (state["GlobalSplitU"] == 1):
+      #   reject(state, "GlobalSplitU == 1, acc tunning")
       if (state["NumElementsPerBatchStore"] == 1):
         reject(state, "too many store at MultipleBufferSingleKernel direct reject")
       if state["ProblemType"]["UseScaleCD"]:
