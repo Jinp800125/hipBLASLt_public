@@ -1089,7 +1089,8 @@ class Solution(collections.abc.Mapping):
       self["AssignedDerivedParameters"] = False
 
     Solution.assignDerivedParameters(self._state)
-    self._name = config["CustomKernelName"] if isCustomKernelConfig(config) else None
+    # self._name = config["CustomKernelName"] if isCustomKernelConfig(config) else None
+    self._name = config["CustomKernelName"]+"_"+str(config["WorkGroupMapping"]) if isCustomKernelConfig(config) else None
     self.initHelperKernelObjects()
 
   # these keys are copied from ProblemType to internal that may be overridden
@@ -2429,6 +2430,9 @@ class Solution(collections.abc.Mapping):
       if padInterval != 0:
         ldsNumBytesA = int((state["_DepthUA"] * state["MacroTileA"] * bpeA) / padInterval * (padInterval + ldsPadA * bpeA))
       ldsNumBytesAlignedA = roundUpToNearestMultiple(ldsNumBytesA, ldsAlign)
+
+      if state["CustomKernelName"] != "":
+        ldsNumBytesAlignedA = 0
 
       if state["UnrollMajorLDSB"]:
         ldsNumBytesB = (state["_DepthUB"] + ldsPadB) * state["MacroTileB"] * bpeB
