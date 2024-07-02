@@ -2574,6 +2574,9 @@ class Solution(collections.abc.Mapping):
         else:
           state["StoreVectorWidth"] = state["VectorWidthA"]
 
+    if state["StoreVectorWidth"] > 8:
+      state["StoreVectorWidth"] = 8
+
     if state["EnableMatrixInstruction"]:
       if state["SourceSwap"]:
         if ((state["VectorWidthA"] % state["StoreVectorWidth"]) != 0):
@@ -2610,6 +2613,10 @@ class Solution(collections.abc.Mapping):
 
     state["NumElementsPerThread"] = numElementsPerWorkGroup // state["NumThreads"]
     state["GlobalWriteVectorWidth"] = min(state["VectorWidthA"], state["NumElementsPerThread"] )
+
+    if state["GlobalWriteVectorWidth"] > 8:
+      state["GlobalWriteVectorWidth"] = 8
+
     if state["NumElementsPerThread"] % state["GlobalWriteVectorWidth"] != 0:
       reject(state, "LSU NumElementsPerThread %u not divisible into GWVW %u" \
           % (state["NumElementsPerThread"], state["GlobalWriteVectorWidth"]))
