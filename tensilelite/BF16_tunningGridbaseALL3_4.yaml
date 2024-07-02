@@ -3391,98 +3391,98 @@ BenchmarkProblems:
         - ClusterLocalRead: [1]
         # - NonTemporalA: [0,4,7]
         # - NonTemporalD: [0,7]
-        - Groups:
-          -
-            - CustomKernelName: ""
-            - MatrixInstruction: [16,16,32, 1,  1,   4,16,  4,1 ] # 256x256 (Occupancy 1)
-              CustomKernelName: "Custom_Cijk_Alik_Bljk_BBS_BH_Bias_AS_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_K1_MIWT4_16_DTVA"
-              AssertFree0ElementMultiple: 1
-              AssertFree1ElementMultiple: 1
-              PrefetchGlobalRead: 2
-              PrefetchLocalRead: 1
-              DepthU: 64
-              VectorWidthA: -1
-              VectorWidthB: -1
-              GlobalReadVectorWidthA: 8
-              GlobalReadVectorWidthB: 8
-              LocalReadVectorWidth: 8
-              TransposeLDS: 1
-              LdsBlockSizePerPadA: -1
-              LdsBlockSizePerPadB: -1
-              LdsPadA: -1
-              LdsPadB: -1
-              StaggerU: 0
-              StaggerUStride: 128
-              WorkGroupMapping: 1
-              StaggerUMapping: 1
-              1LDSBuffer: -1
-              GlobalReadPerMfma: 1
-              LocalWritePerMfma: -1
-              StoreRemapVectorWidth: 0
-              StoreVectorWidth: -1
-              SourceSwap: 1
-              NumElementsPerBatchStore: 16
-              ClusterLocalRead: 1
+        # - Groups:
+        #   -
+        #     - CustomKernelName: ""
+        #     - MatrixInstruction: [16,16,32, 1,  1,   4,16,  4,1 ] # 256x256 (Occupancy 1)
+        #       CustomKernelName: "Custom_Cijk_Alik_Bljk_BBS_BH_Bias_AS_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_K1_MIWT4_16_DTVA"
+        #       AssertFree0ElementMultiple: 1
+        #       AssertFree1ElementMultiple: 1
+        #       PrefetchGlobalRead: 2
+        #       PrefetchLocalRead: 1
+        #       DepthU: 64
+        #       VectorWidthA: -1
+        #       VectorWidthB: -1
+        #       GlobalReadVectorWidthA: 8
+        #       GlobalReadVectorWidthB: 8
+        #       LocalReadVectorWidth: 8
+        #       TransposeLDS: 1
+        #       LdsBlockSizePerPadA: -1
+        #       LdsBlockSizePerPadB: -1
+        #       LdsPadA: -1
+        #       LdsPadB: -1
+        #       StaggerU: 0
+        #       StaggerUStride: 128
+        #       WorkGroupMapping: 1
+        #       StaggerUMapping: 1
+        #       1LDSBuffer: -1
+        #       GlobalReadPerMfma: 1
+        #       LocalWritePerMfma: -1
+        #       StoreRemapVectorWidth: 0
+        #       StoreVectorWidth: -1
+        #       SourceSwap: 1
+        #       NumElementsPerBatchStore: 16
+        #       ClusterLocalRead: 1
 
-            - MatrixInstruction: [16,16,32, 1,  1,   4,16,  4,1 ] # 256x256 (Occupancy 1)
-              CustomKernelName: "Custom_Cijk_Alik_Bljk_BBS_BH_Bias_AS_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_K1_MIWT4_16_DTVA"
-              AssertFree0ElementMultiple: 1
-              AssertFree1ElementMultiple: 1
-              PrefetchGlobalRead: 2
-              PrefetchLocalRead: 1
-              DepthU: 64
-              VectorWidthA: -1
-              VectorWidthB: -1
-              GlobalReadVectorWidthA: 8
-              GlobalReadVectorWidthB: 8
-              LocalReadVectorWidth: 8
-              TransposeLDS: 1
-              LdsBlockSizePerPadA: -1
-              LdsBlockSizePerPadB: -1
-              LdsPadA: -1
-              LdsPadB: -1
-              StaggerU: 0
-              StaggerUStride: 128
-              WorkGroupMapping: 8
-              StaggerUMapping: 1
-              1LDSBuffer: -1
-              GlobalReadPerMfma: 1
-              LocalWritePerMfma: -1
-              StoreRemapVectorWidth: 0
-              StoreVectorWidth: -1
-              SourceSwap: 1
-              NumElementsPerBatchStore: 16
-              ClusterLocalRead: 1
+        #     - MatrixInstruction: [16,16,32, 1,  1,   4,16,  4,1 ] # 256x256 (Occupancy 1)
+        #       CustomKernelName: "Custom_Cijk_Alik_Bljk_BBS_BH_Bias_AS_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_K1_MIWT4_16_DTVA"
+        #       AssertFree0ElementMultiple: 1
+        #       AssertFree1ElementMultiple: 1
+        #       PrefetchGlobalRead: 2
+        #       PrefetchLocalRead: 1
+        #       DepthU: 64
+        #       VectorWidthA: -1
+        #       VectorWidthB: -1
+        #       GlobalReadVectorWidthA: 8
+        #       GlobalReadVectorWidthB: 8
+        #       LocalReadVectorWidth: 8
+        #       TransposeLDS: 1
+        #       LdsBlockSizePerPadA: -1
+        #       LdsBlockSizePerPadB: -1
+        #       LdsPadA: -1
+        #       LdsPadB: -1
+        #       StaggerU: 0
+        #       StaggerUStride: 128
+        #       WorkGroupMapping: 8
+        #       StaggerUMapping: 1
+        #       1LDSBuffer: -1
+        #       GlobalReadPerMfma: 1
+        #       LocalWritePerMfma: -1
+        #       StoreRemapVectorWidth: 0
+        #       StoreVectorWidth: -1
+        #       SourceSwap: 1
+        #       NumElementsPerBatchStore: 16
+        #       ClusterLocalRead: 1
 
-            - MatrixInstruction: [16,16,32, 1,  1,   4,16,  4,1 ] # 256x256 (Occupancy 1)
-              CustomKernelName: "Custom_Cijk_Alik_Bljk_BBS_BH_Bias_AS_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_K1_MIWT4_16_DTVA"
-              AssertFree0ElementMultiple: 1
-              AssertFree1ElementMultiple: 1
-              PrefetchGlobalRead: 2
-              PrefetchLocalRead: 1
-              DepthU: 64
-              VectorWidthA: -1
-              VectorWidthB: -1
-              GlobalReadVectorWidthA: 8
-              GlobalReadVectorWidthB: 8
-              LocalReadVectorWidth: 8
-              TransposeLDS: 1
-              LdsBlockSizePerPadA: -1
-              LdsBlockSizePerPadB: -1
-              LdsPadA: -1
-              LdsPadB: -1
-              StaggerU: 0
-              StaggerUStride: 128
-              WorkGroupMapping: 304
-              StaggerUMapping: 1
-              1LDSBuffer: -1
-              GlobalReadPerMfma: 1
-              LocalWritePerMfma: -1
-              StoreRemapVectorWidth: 0
-              StoreVectorWidth: -1
-              SourceSwap: 1
-              NumElementsPerBatchStore: 16
-              ClusterLocalRead: 1
+        #     - MatrixInstruction: [16,16,32, 1,  1,   4,16,  4,1 ] # 256x256 (Occupancy 1)
+        #       CustomKernelName: "Custom_Cijk_Alik_Bljk_BBS_BH_Bias_AS_SAV_UserArgs_MT256x256x64_MI16x16x1_SN_K1_MIWT4_16_DTVA"
+        #       AssertFree0ElementMultiple: 1
+        #       AssertFree1ElementMultiple: 1
+        #       PrefetchGlobalRead: 2
+        #       PrefetchLocalRead: 1
+        #       DepthU: 64
+        #       VectorWidthA: -1
+        #       VectorWidthB: -1
+        #       GlobalReadVectorWidthA: 8
+        #       GlobalReadVectorWidthB: 8
+        #       LocalReadVectorWidth: 8
+        #       TransposeLDS: 1
+        #       LdsBlockSizePerPadA: -1
+        #       LdsBlockSizePerPadB: -1
+        #       LdsPadA: -1
+        #       LdsPadB: -1
+        #       StaggerU: 0
+        #       StaggerUStride: 128
+        #       WorkGroupMapping: 304
+        #       StaggerUMapping: 1
+        #       1LDSBuffer: -1
+        #       GlobalReadPerMfma: 1
+        #       LocalWritePerMfma: -1
+        #       StoreRemapVectorWidth: 0
+        #       StoreVectorWidth: -1
+        #       SourceSwap: 1
+        #       NumElementsPerBatchStore: 16
+        #       ClusterLocalRead: 1
 
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
