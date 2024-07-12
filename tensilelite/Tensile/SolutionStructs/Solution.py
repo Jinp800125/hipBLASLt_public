@@ -222,7 +222,8 @@ class Solution(collections.abc.Mapping):
       isaInfoMap,
       assembler.rocm_version
     )
-    self._name = config["CustomKernelName"] if "CustomKernelName" in config and config["CustomKernelName"] else None
+    # self._name = config["CustomKernelName"] if "CustomKernelName" in config and config["CustomKernelName"] else None
+    self._name = config["CustomKernelName"] + "_" + str(config["WorkGroupMapping"]) if "CustomKernelName" in config and config["CustomKernelName"] else None
 
   # these keys are copied from ProblemType to internal that may be overridden
   InternalKeys = ["UseSgprForGRO","VectorStore"]
@@ -992,6 +993,10 @@ class Solution(collections.abc.Mapping):
       state["StreamKAtomic"] = 0
       state["StreamKXCCMapping"] = 0
       state["DebugStreamK"] = 0
+    
+    if 0: ## for tunning
+      state["TunningSkip"] = 1
+    #   state["BatchSizeEqual"] = 1
 
     computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
     state["_WorkspaceSizePerElemC"] = computeBytes
@@ -2106,6 +2111,9 @@ class Solution(collections.abc.Mapping):
         else:
           state["StoreVectorWidth"] = state["VectorWidthA"]
 
+    # if state["StoreVectorWidth"] > 8:
+    #    state["StoreVectorWidth"] = 8
+
     if state["EnableMatrixInstruction"]:
       if state["SourceSwap"]:
         if ((state["VectorWidthA"] % state["StoreVectorWidth"]) != 0):
@@ -2127,6 +2135,10 @@ class Solution(collections.abc.Mapping):
 
     state["NumElementsPerThread"] = numElementsPerWorkGroup // state["NumThreads"]
     state["GlobalWriteVectorWidth"] = min(state["VectorWidthA"], state["NumElementsPerThread"] )
+
+    # if state["GlobalWriteVectorWidth"] > 8:
+      #  state["GlobalWriteVectorWidth"] = 8
+
     if state["NumElementsPerThread"] % state["GlobalWriteVectorWidth"] != 0:
       reject(state, printRejectionReason, "LSU NumElementsPerThread %u not divisible into GWVW %u" \
           % (state["NumElementsPerThread"], state["GlobalWriteVectorWidth"]))

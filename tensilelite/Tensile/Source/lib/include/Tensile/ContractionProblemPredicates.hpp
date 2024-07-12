@@ -264,6 +264,110 @@ namespace TensileLite
                 }
             };
 
+            struct TunningSkip
+                : public Predicate_CRTP<TunningSkip, ContractionProblemGemm>
+            {
+                enum
+                {
+                    HasIndex = true,
+                    HasValue = true
+                };
+                size_t             index;
+                std::array<int, 6> value;
+
+                TunningSkip() = default;
+                TunningSkip(size_t index, std::array<int, 6> value)
+                    : index(index)
+                    , value(value)
+                {
+                }
+
+                static std::string Type()
+                {
+                    return "TunningSkip";
+                }
+
+                virtual bool operator()(ContractionProblemGemm const& problem) const override
+                {
+                    // // WorkGroup numbers x number of global write instruction x Wave numbers
+                    // // M/MT0 x N/MT1 x NumElementsPerThread/StoreVectorWidth x x Wavenumbers
+                    // bool ret = (std::ceil(static_cast<float>(problem.freeSizeA(0)) / value[0])
+                    //             * std::ceil(static_cast<float>(problem.freeSizeB(0)) / value[1]))
+                    //             * (value[2]) * (value[4] / 64) * value[3]
+                    //            <= 40960;
+                    // if(problem.groupedGemm())
+                    //     ret = ret && (problem.groupedGemmCount() <= 16);
+
+                    // Gran < 0.5
+                    // MT0>(ceil(ceil(M/16)/4)*4)*16 or MT1>(ceil(ceil(N/16)/4)*4)*16
+                    float MT0 = value[0];
+                    float MT1 = value[1];
+                    int GSU = value[2];
+                    int WT0xWT1 = value[3];
+                    int LdsNumBytes = value[4];
+                    int DU = value[5];
+
+                    bool ret = (MT0 <= (std::ceil(std::ceil(problem.d().sizes()[0]/16.0)/4)*4)*16) 
+                            && (MT1 <= (std::ceil(std::ceil(problem.d().sizes()[1]/16.0)/4)*4)*16);
+
+                    size_t minK
+                        = (problem.getParams().gsu() > 0 ? problem.getParams().gsu() : GSU);
+
+                    if (minK == 1)
+                        minK = 0;
+                    minK *= 64;
+
+                    if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16) / 0.5) // (minMT0 x minMT1 x CUnums / maxGSU) / granularityCheck
+                        ret = ret && ((((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5);
+                    // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (128*128*304))
+                    if (DU >= 1024)
+                        ret = ret && (LdsNumBytes > 16384);
+                    else
+                        ret = ret && (LdsNumBytes < 32768);
+                    // else
+                    //     ret = ret && (GSU == 16 || GSU == 8 || GSU == 1);
+
+                    float occupancy = 256*256*304*1.0;
+                    int tmp6 = std::ceil((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy);
+                    // if (((problem.d().sizes()[0] * problem.d().sizes()[1]) < 256*256*304) and (WT0xWT1 > 2))
+                    // if (WT0xWT1 > 2)
+                    if ((problem.d().sizes()[0] * problem.d().sizes()[1]) < 256*256*304)
+                        ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (2*tmp6));
+                    else
+                        ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (2*tmp6));
+
+                    return ret;
+                }
+
+                virtual bool debugEval(ContractionProblemGemm const& problem,
+                                       std::ostream&                 stream) const override
+                {
+                    float MT0 = value[0];
+                    float MT1 = value[1];
+                    float Gra = (value[2]*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304;
+                    float Run = std::ceil((value[2]*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304);
+                    float Gra_percent = Gra / 1.0;
+                    return debugEvalCmp(
+                        problem,
+                        stream,
+                        "0.5",
+                        Gra,
+                        "==",
+                        "4",
+                        Run);
+                    // return debugEvalCmp(
+                    //     problem,
+                    //     stream,
+                    //     "MT0",
+                    //     value[0], "<=?", (std::ceil(std::ceil(problem.d().sizes()[0]/16)/4)*4)*16,
+                    //     "MT1",
+                    //     value[1], "<=?", (std::ceil(std::ceil(problem.d().sizes()[1]/16)/4)*4)*16,
+                    //     "0.5", "<?",
+                    //     (((std::ceil(problem.d().sizes()[0]/value[0])*std::ceil(problem.d().sizes()[1]/value[1]))/304) / std::ceil((std::ceil(problem.d().sizes()[0]/value[0])*std::ceil(problem.d().sizes()[1]/value[1]))/304)) );
+                }
+            };
+
             struct BoundSizeMultiple
                 : public Predicate_CRTP<BoundSizeMultiple, ContractionProblemGemm>
             {
