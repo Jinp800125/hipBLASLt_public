@@ -427,6 +427,16 @@ class ProblemPredicate(Properties.Predicate):
             valuepredicates.append(state["NumThreads"])
             rv += [cls('SynchronizerSizeCheck', index=0, value=valuepredicates)]
 
+        if "TunningSkip" in state:
+            valuepredicates = [];
+            valuepredicates.append(state["MacroTile0"])
+            valuepredicates.append(state["MacroTile1"])
+            valuepredicates.append(state['GlobalSplitU'])
+            valuepredicates.append(state["MIWaveGroup"][0]*state["MIWaveGroup"][1])
+            # valuepredicates.append(state['GlobalSplitU'])
+            
+            rv += [cls('TunningSkip', index=0, value=valuepredicates)]
+
         if not problemType.aType.isInt8x4():
             # calculate the minimum supported free dimension size
             TLUA = state['ProblemType']['TLUA']

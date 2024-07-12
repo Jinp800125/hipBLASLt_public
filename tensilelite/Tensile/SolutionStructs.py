@@ -1946,6 +1946,10 @@ class Solution(collections.abc.Mapping):
       state["SynchronizerSizeCheck"] = 1
     #   state["BatchSizeEqual"] = 1
 
+    if 1: ## for tunning
+      state["TunningSkip"] = 1
+    #   state["BatchSizeEqual"] = 1
+
     computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
     state["_WorkspaceSizePerElemC"] = computeBytes
     state["_WorkspaceSizePerElemBias"] = 0
