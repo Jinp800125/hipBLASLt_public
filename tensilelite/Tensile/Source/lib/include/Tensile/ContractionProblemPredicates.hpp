@@ -290,16 +290,24 @@ namespace Tensile
 
                     // Gran < 0.5
                     // MT0>(ceil(ceil(M/16)/4)*4)*16 or MT1>(ceil(ceil(N/16)/4)*4)*16
-                    int MT0 = value[0];
-                    int MT1 = value[1];
+                    float MT0 = value[0];
+                    float MT1 = value[1];
                     int GSU = value[2];
                     int WT0xWT1 = value[3];
 
                     bool ret = (MT0 <= (std::ceil(std::ceil(problem.d().sizes()[0]/16.0)/4)*4)*16) 
-                            and (MT1 <= (std::ceil(std::ceil(problem.d().sizes()[1]/16.0)/4)*4)*16) 
-                            and ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil(GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5;
+                            && (MT1 <= (std::ceil(std::ceil(problem.d().sizes()[1]/16.0)/4)*4)*16);
 
-                    float occupancy = 256*256*304;
+                    size_t minK
+                        = (problem.getParams().gsu() > 0 ? problem.getParams().gsu() : 64);
+
+                    if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16)) && (minK > 256)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16) / 0.5) // (minMT0 x minMT1 x CUnums / maxGSU) / granularityCheck
+                        ret = ret && ((((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5);
+                    else
+                        ret = ret && (GSU == 16 || GSU == 8 || GSU == 1);
+
+                    float occupancy = 256*256*304*1.0;
                     int tmp6 = std::ceil((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy);
                     // if (((problem.d().sizes()[0] * problem.d().sizes()[1]) < 256*256*304) and (WT0xWT1 > 2))
                     if (WT0xWT1 > 2)
@@ -311,14 +319,19 @@ namespace Tensile
                 virtual bool debugEval(ContractionProblemGemm const& problem,
                                        std::ostream&                 stream) const override
                 {
+                    float MT0 = value[0];
+                    float MT1 = value[1];
+                    float Gra = (value[2]*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304;
+                    float Run = std::ceil((value[2]*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304);
+                    float Gra_percent = Gra / 1.0;
                     return debugEvalCmp(
                         problem,
                         stream,
                         "0.5",
-                        (((std::ceil(problem.d().sizes()[0]/value[0])*std::ceil(problem.d().sizes()[1]/value[1]))/304) / std::ceil((std::ceil(problem.d().sizes()[0]/value[0])*std::ceil(problem.d().sizes()[1]/value[1]))/304)),
+                        Gra,
                         "==",
                         "4",
-                        (value[2]*(std::ceil(problem.d().sizes()[0]/value[0])*std::ceil(problem.d().sizes()[1]/value[1]))/304));
+                        Run);
                     // return debugEvalCmp(
                     //     problem,
                     //     stream,
