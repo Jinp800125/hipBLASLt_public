@@ -294,16 +294,23 @@ namespace Tensile
                     float MT1 = value[1];
                     int GSU = value[2];
                     int WT0xWT1 = value[3];
+                    int LdsNumBytes = value[4];
 
                     bool ret = (MT0 <= (std::ceil(std::ceil(problem.d().sizes()[0]/16.0)/4)*4)*16) 
                             && (MT1 <= (std::ceil(std::ceil(problem.d().sizes()[1]/16.0)/4)*4)*16);
 
                     size_t minK
-                        = (problem.getParams().gsu() > 0 ? problem.getParams().gsu() : 64);
+                        = (problem.getParams().gsu() > 0 ? problem.getParams().gsu() : GSU);
 
-                    if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16)) && (minK > 256)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    if (minK == 1)
+                        minK = 0;
+                    minK *= 64;
+
+                    if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
                     // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16) / 0.5) // (minMT0 x minMT1 x CUnums / maxGSU) / granularityCheck
                         ret = ret && ((((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5);
+                        if (problem.d().sizes()[0]*problem.d().sizes()[1] > (128*128*304))
+                            ret = ret && (LdsNumBytes > 16384);
                     else
                         ret = ret && (GSU == 16 || GSU == 8 || GSU == 1);
 

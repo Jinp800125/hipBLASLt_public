@@ -433,7 +433,7 @@ class ProblemPredicate(Properties.Predicate):
             valuepredicates.append(state["MacroTile1"])
             valuepredicates.append(state['GlobalSplitU'])
             valuepredicates.append(state["MIWaveGroup"][0]*state["MIWaveGroup"][1])
-            # valuepredicates.append(state['GlobalSplitU'])
+            valuepredicates.append(state['LdsNumBytes'])
             
             rv += [cls('TunningSkip', index=0, value=valuepredicates)]
 
