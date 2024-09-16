@@ -301,6 +301,9 @@ namespace TensileLite
                 m_currentSolutionIdx = m_qSolutionIdx.front().first;
                 m_currentPrediction  = m_qSolutionIdx.front().second;
             }
+            if (VICTOR_LOG) // Victor check
+                std::cout << "AllSolutionsIterator::postSolution\n"; // Victor check
+            m_currentSolutionIdx++; // Victor check
         }
 
         bool AllSolutionsIterator::moreSolutionsInProblem() const
@@ -310,6 +313,8 @@ namespace TensileLite
 
         std::shared_ptr<ContractionSolution> AllSolutionsIterator::getSolution()
         {
+            if (VICTOR_LOG)
+                std::cout << "AllSolutionsIterator::getSolution\n";
             auto iter = m_library->solutions.find(m_currentSolutionIdx);
             if(iter == m_library->solutions.end())
                 return std::shared_ptr<ContractionSolution>();
@@ -317,6 +322,19 @@ namespace TensileLite
             return iter->second;
         }
 
+        std::shared_ptr<ContractionSolution> AllSolutionsIterator::getSolution(int i_SolutionIdx)
+        {
+            if (VICTOR_LOG)
+                std::cout << "AllSolutionsIterator::getSolution2\n";
+            auto iter = m_library->solutions.find(i_SolutionIdx);
+            if(iter == m_library->solutions.end())
+                return std::shared_ptr<ContractionSolution>();
+
+            m_currentSolutionIdx = i_SolutionIdx;
+
+            return iter->second;
+        }
+        
         bool AllSolutionsIterator::runCurrentSolution()
         {
             auto solution = getSolution();
@@ -388,6 +406,8 @@ namespace TensileLite
 
         void BestSolutionIterator::postSolution()
         {
+            // if (VICTOR_LOG)
+            //     std::cout << "BestSolutionIterator::postSolution\n";
             m_usedCurrentSolution = true;
         }
 
@@ -397,6 +417,11 @@ namespace TensileLite
         }
 
         std::shared_ptr<ContractionSolution> BestSolutionIterator::getSolution()
+        {
+            return m_currentSolution;
+        }
+
+        std::shared_ptr<ContractionSolution> BestSolutionIterator::getSolution(int i_SolutionIdx)
         {
             return m_currentSolution;
         }
@@ -504,6 +529,9 @@ namespace TensileLite
                 m_currentSolutionIdx = m_qSolutionIdx.front().first;
                 m_currentPrediction  = m_qSolutionIdx.front().second;
             }
+            // if (VICTOR_LOG)
+            //     std::cout << "TopSolutionIterator::postSolution\n";
+            m_currentSolutionIdx++; // Victor check
         }
 
         bool TopSolutionIterator::moreSolutionsInProblem() const
@@ -515,6 +543,11 @@ namespace TensileLite
         std::shared_ptr<ContractionSolution> TopSolutionIterator::getSolution()
         {
             return m_solutions[m_currentSolutionIdx];
+        }
+
+        std::shared_ptr<ContractionSolution> TopSolutionIterator::getSolution(int i_SolutionIdx)
+        {
+            return m_solutions[i_SolutionIdx];
         }
     } // namespace Client
 } // namespace TensileLite

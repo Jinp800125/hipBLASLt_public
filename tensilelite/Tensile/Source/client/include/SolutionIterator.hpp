@@ -118,6 +118,7 @@ namespace TensileLite
 
             virtual bool                                 moreSolutionsInProblem() const = 0;
             virtual std::shared_ptr<ContractionSolution> getSolution()                  = 0;
+            virtual std::shared_ptr<ContractionSolution> getSolution(int i_SolutionIdx) = 0;
             virtual bool                                 runCurrentSolution();
 
             virtual void preProblem(ContractionProblem* const problem) override;
@@ -165,6 +166,7 @@ namespace TensileLite
 
             virtual bool                                 moreSolutionsInProblem() const override;
             virtual std::shared_ptr<ContractionSolution> getSolution() override;
+            virtual std::shared_ptr<ContractionSolution> getSolution(int i_SolutionIdx) override;
             virtual bool                                 runCurrentSolution() override;
 
         private:
@@ -200,6 +202,7 @@ namespace TensileLite
 
             virtual bool                                 moreSolutionsInProblem() const override;
             virtual std::shared_ptr<ContractionSolution> getSolution() override;
+            virtual std::shared_ptr<ContractionSolution> getSolution(int i_SolutionIdx) override;
 
         private:
             std::shared_ptr<ContractionSolution> m_currentSolution;
@@ -224,6 +227,7 @@ namespace TensileLite
 
             virtual bool                                 moreSolutionsInProblem() const override;
             virtual std::shared_ptr<ContractionSolution> getSolution() override;
+            virtual std::shared_ptr<ContractionSolution> getSolution(int i_SolutionIdx) override;
 
         private:
             std::vector<std::shared_ptr<ContractionSolution>> m_solutions;

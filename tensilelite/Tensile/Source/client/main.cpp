@@ -723,8 +723,12 @@ int main(int argc, const char* argv[])
                 auto problem = problems[problemIdx].get();
 
                 reporters->report(ResultKey::ProblemIndex, problemIdx);
+                if (VICTOR_LOG)
+                    std::cout << "Victor_Debug1\n";
                 reporters->report(ResultKey::ProblemProgress,
                                   concatenate(problemIdx, "/", lastProblemIdx));
+                if (VICTOR_LOG)
+                    std::cout << "Victor_Debug2\n";
 
                 listeners.preProblem(problem);
                 auto inputs = dataInit->prepareGPUInputs(problem);
@@ -762,6 +766,8 @@ int main(int argc, const char* argv[])
                                 resetInput = true;
 
                                 std::vector<std::vector<KernelInvocation>> kernels;
+                                if (VICTOR_LOG)
+                                    std::cout << "inputArr.size( " << inputArr.size() << " )\n";
                                 for(size_t r = 0; r < inputArr.size(); r++)
                                 {
                                     auto kernel = useUserArgs
@@ -814,10 +820,12 @@ int main(int argc, const char* argv[])
                                         TimingEvents stopEvents(enq, eventCount);
 
                                         listeners.preEnqueues(stream);
-
+                                        if (VICTOR_LOG)
+                                            std::cout << "Victor enq( " << enq << " )\n";
                                         for(int j = 0; j < enq; j++)
                                         {
                                             size_t kIdx = ((i * enq) + j) % kernels.size();
+                                            // std::cout << "Victor kIdx( " << kIdx << " )\n";
                                             HIP_CHECK_EXC(adapter.launchKernels(
                                                 kernels[kIdx], stream, nullptr, nullptr));
 
@@ -833,6 +841,8 @@ int main(int argc, const char* argv[])
                                     }
 
                                 listeners.postSyncs();
+                                if (VICTOR_LOG)
+                                    std::cout << "Victor Debug(  2  )\n";
 
                                 if(useUserArgs)
                                 {
@@ -847,9 +857,139 @@ int main(int argc, const char* argv[])
                                            concatenate("Exception occurred: ", err.what(), "\n"));
                         }
                     }
-
+                    if (VICTOR_LOG)
+                        std::cout << "Victor Debug(  3  )\n";
                     listeners.postSolution();
+                    if (VICTOR_LOG)
+                        std::cout << "Victor Debug(  5  )\n";
+                    if(exitOnError && listeners.error() > 0)
+                    {
+                        // error range in shell is [0-255]
+                        return std::min(listeners.error(), 255);
+                    }
+                }
+                std::cout << "STEP1 END\n";
+                // while(solutionIterator->moreSolutionsInProblem())
+                {
+                    auto solution = solutionIterator->getSolution(0);
+                    if(solution == nullptr)
+                        throw std::runtime_error("Could not find a solution");
 
+                    listeners.preSolution(*solution);
+                    if(solutionIterator->runCurrentSolution() && runKernels)
+                    {
+                        try
+                        {
+                            while(listeners.needMoreRunsInSolution())
+                            {
+                                if(resetInput)
+                                {
+                                    auto inputs = dataInit->prepareGPUInputs(problem);
+                                    inputArr[0] = inputs;
+                                }
+                                resetInput = true;
+
+                                std::vector<std::vector<KernelInvocation>> kernels;
+                                if (VICTOR_LOG)
+                                    std::cout << "STEP1 inputArr.size( " << inputArr.size() << " )\n";
+                                for(size_t r = 0; r < inputArr.size(); r++)
+                                {
+                                    auto kernel = useUserArgs
+                                                      ? solution->solveTensileGPU((*problem),
+                                                                                  *inputArr[r],
+                                                                                  *hardware,
+                                                                                  &dUA,
+                                                                                  &dUAHost,
+                                                                                  nullptr,
+                                                                                  0,
+                                                                                  stream)
+                                                      : solution->solve((*problem),
+                                                                        *inputArr[r],
+                                                                        *hardware,
+                                                                        nullptr,
+                                                                        0,
+                                                                        stream);
+                                    kernels.push_back(kernel);
+                                }
+
+                                size_t       warmupInvocations = listeners.numWarmupRuns();
+                                size_t       eventCount        = gpuTimer ? kernels[0].size() : 0;
+                                TimingEvents warmupStartEvents(warmupInvocations, eventCount);
+                                TimingEvents warmupStopEvents(warmupInvocations, eventCount);
+
+                                for(int i = 0; i < warmupInvocations; i++)
+                                {
+                                    size_t kIdx = i % kernels.size();
+                                    listeners.preWarmup();
+                                    if(gpuTimer)
+                                        HIP_CHECK_EXC(adapter.launchKernels(kernels[kIdx],
+                                                                            stream,
+                                                                            warmupStartEvents[i],
+                                                                            warmupStopEvents[i]));
+                                    else
+                                        HIP_CHECK_EXC(adapter.launchKernels(
+                                            kernels[kIdx], stream, nullptr, nullptr));
+                                    listeners.postWarmup();
+                                    // Do validation after first warmup
+                                    if(i == 0)
+                                        listeners.validateWarmups(
+                                            inputs, warmupStartEvents, warmupStopEvents);
+                                }
+
+                                size_t syncs = listeners.numSyncs();
+                                size_t enq   = listeners.numEnqueuesPerSync();
+
+                                listeners.preSyncs();
+
+                                for(int i = 0; i < syncs; i++)
+                                {
+                                    TimingEvents startEvents(enq, eventCount);
+                                    TimingEvents stopEvents(enq, eventCount);
+
+                                    listeners.preEnqueues(stream);
+
+                                    if (VICTOR_LOG)
+                                        std::cout << "STEP2 Victor enq( " << enq << " )\n";
+                                    for(int j = 0; j < enq; j++)
+                                    {
+                                        size_t kIdx = ((i * enq) + j) % kernels.size();
+                                        // std::cout << "Victor kIdx( " << kIdx << " )\n";
+                                        HIP_CHECK_EXC(adapter.launchKernels(
+                                            kernels[kIdx], stream, nullptr, nullptr));
+
+                                        if(icacheFlush)
+                                        {
+                                            hipLaunchKernelGGL(
+                                                flush_icache, flushGridSize, 64, 0, stream);
+                                        }
+                                    }
+
+                                    listeners.postEnqueues(startEvents, stopEvents, stream);
+                                    listeners.validateEnqueues(inputs, startEvents, stopEvents);
+                                }
+
+                                listeners.postSyncs();
+                                if (VICTOR_LOG)
+                                    std::cout << "STEP2 Victor Debug(  2  )\n";
+
+                                if(useUserArgs)
+                                {
+                                    solution->relaseDeviceUserArgs(dUA, dUAHost);
+                                }
+                            }
+                        }
+                        catch(std::runtime_error const& err)
+                        {
+                            reporters->report(ResultKey::Validation, "INVALID");
+                            reporters->log(LogLevel::Error,
+                                           concatenate("Exception occurred: ", err.what(), "\n"));
+                        }
+                    }
+                    if (VICTOR_LOG)
+                        std::cout << "STEP2 Victor Debug(  3  )\n";
+                    listeners.postSolution();
+                    if (VICTOR_LOG)
+                        std::cout << "STEP2 Victor Debug(  5  )\n";
                     if(exitOnError && listeners.error() > 0)
                     {
                         // error range in shell is [0-255]
@@ -857,10 +997,13 @@ int main(int argc, const char* argv[])
                     }
                 }
 
+                if (VICTOR_LOG)
+                    std::cout << "listeners.postProblem()\n";
                 listeners.postProblem();
             }
         }
-
+        if (VICTOR_LOG)
+            std::cout << "listeners.postBenchmarkRun()\n";
         listeners.postBenchmarkRun();
     }
 

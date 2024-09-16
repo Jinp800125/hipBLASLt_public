@@ -103,8 +103,13 @@ namespace TensileLite
 
         void MetaRunListener::postSolution()
         {
+            if (VICTOR_LOG)
+                std::cout << "MetaRunListener::postSolution\n";
             for(auto iter = m_listeners.rbegin(); iter != m_listeners.rend(); iter++)
+            {
+                //std::cout << "iter\n";
                 (*iter)->postSolution();
+            }
         }
 
         bool MetaRunListener::needMoreRunsInSolution() const

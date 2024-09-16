@@ -168,6 +168,7 @@ namespace TensileLite
 
         void LibraryUpdateReporter::postSolution()
         {
+            std::cout << "LibraryUpdateReporter::postSolution\n";
             // cascade from BenchmarkTimer, SpeedGFlops second
             if(m_curSolutionPassed && m_curSolutionSpeed > m_fastestSolutionSpeed)
             {

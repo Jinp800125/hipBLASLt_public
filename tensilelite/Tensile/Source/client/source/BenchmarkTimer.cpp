@@ -95,6 +95,8 @@ namespace TensileLite
 
         void BenchmarkTimer::preSolution(ContractionSolution const& solution)
         {
+            if (VICTOR_LOG)
+                std::cout << "BenchmarkTimer::preSolution\n";
             m_numEnqueuesInSolution = 0;
             m_timeInSolution        = double_millis::zero();
             m_skip_slow_solution    = false;
@@ -131,6 +133,8 @@ namespace TensileLite
 
         void BenchmarkTimer::postSolution()
         {
+            if (VICTOR_LOG)
+                std::cout << "BenchmarkTimer::postSolution\n";
             double timePerEnqueue_us
                 = !m_skip_slow_solution
                       ? double_micros(m_timeInSolution).count() / m_numEnqueuesInSolution
@@ -160,6 +164,8 @@ namespace TensileLite
             int    usedCus = std::min(tiles, perf.CUs);
             double gflopsPerCu = gflops / usedCus;
 
+            if (VICTOR_LOG)
+                std::cout << "BenchmarkTimer::postSolution() report::TimeUS\n";
             m_reporter->report(ResultKey::TimeUS, timePerEnqueue_us);
             m_reporter->report(ResultKey::SpeedGFlopsPerCu, gflopsPerCu);
             m_reporter->report(ResultKey::SpeedGFlops, gflops);

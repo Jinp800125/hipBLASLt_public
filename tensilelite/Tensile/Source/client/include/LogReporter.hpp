@@ -355,6 +355,8 @@ namespace TensileLite
 
             virtual void postSolution() override
             {
+                if (VICTOR_LOG)
+                    std::cout << "LogReporter.hpp::postSolution S\n";
                 std::unordered_map<std::string, std::string> curRow;
                 m_csvOutput.readCurrentRow(curRow);
                 bool  validation    = !(curRow[ResultKey::Validation] == "FAILED"
@@ -380,6 +382,8 @@ namespace TensileLite
                     m_firstRun = false;
                 }
                 m_csvOutput.pop();
+                if (VICTOR_LOG)
+                    std::cout << "LogReporter.hpp::postSolution E\n";
             }
 
             virtual void postProblem() override

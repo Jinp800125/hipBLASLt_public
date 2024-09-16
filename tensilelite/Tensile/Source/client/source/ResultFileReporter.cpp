@@ -60,6 +60,8 @@ namespace TensileLite
         template <typename T>
         void ResultFileReporter::reportValue(std::string const& key, T const& value)
         {
+            // if (VICTOR_LOG)
+            //     std::cout << "ResultFileReporter::reportValue\n";
             std::string valueStr = boost::lexical_cast<std::string>(value);
 
             if(key == ResultKey::Validation)
@@ -81,6 +83,11 @@ namespace TensileLite
             }
             else if(key == ResultKey::TimeUS)
             {
+                if (VICTOR_LOG) // Victor check
+                    std::cout << "ResultFileReporter::reportValue::TimeUS\n"; // Victor check
+                // cascade from BenchmarkTimer, Time-US first
+                // ++m_currSolutionIdx;
+                m_currSolutionIdx = std::stod(m_output.readValueFromKey(ResultKey::SolutionIndex)); // Victor check
                 if(!m_invalidSolution)
                 {
                     double timeUS = std::stod(valueStr);
@@ -301,6 +308,8 @@ namespace TensileLite
 
         void ResultFileReporter::postSolution()
         {
+            if (VICTOR_LOG)
+                std::cout << "ResultFileReporter::postSolution\n";
             m_solutionName    = "";
             m_invalidSolution = false;
         }

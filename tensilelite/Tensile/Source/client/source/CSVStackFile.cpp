@@ -133,7 +133,8 @@ namespace TensileLite
 
                 firstCol = false;
             }
-
+            if (VICTOR_LOG)
+                std::cout << "\nPRINT HERE!!!\n";
             (*m_stream) << std::endl;
         }
 

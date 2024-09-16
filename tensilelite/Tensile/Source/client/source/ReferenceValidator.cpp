@@ -750,6 +750,8 @@ namespace TensileLite
             if(!m_executedSolution)
                 return;
 
+            if (VICTOR_LOG)
+                std::cout << "ReferenceValidator::postSolution\n";
             if(m_enabled && !m_validatedSolution)
                 return;
 
