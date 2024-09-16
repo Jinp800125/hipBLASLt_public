@@ -868,10 +868,14 @@ int main(int argc, const char* argv[])
                         return std::min(listeners.error(), 255);
                     }
                 }
-                std::cout << "STEP1 END\n";
+                if (VICTOR_LOG)
+                    std::cout << "STEP1 END\n";
+                listeners.STEP2resetProblem();
+                if (VICTOR_LOG)
+                    std::cout << "CLEAR STEP1 RESULT\n";
                 // while(solutionIterator->moreSolutionsInProblem())
                 {
-                    auto solution = solutionIterator->getSolution(0);
+                    auto solution = solutionIterator->getSolution(5);
                     if(solution == nullptr)
                         throw std::runtime_error("Could not find a solution");
 

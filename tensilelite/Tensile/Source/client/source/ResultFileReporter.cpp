@@ -306,6 +306,20 @@ namespace TensileLite
             }
         }
 
+        void ResultFileReporter::STEP2resetProblem()
+        {
+            if (VICTOR_LOG)
+                std::cout << "ResultFileReporter::STEP2resetProblem\n";
+            // reset
+            m_winnerSolution          = "";
+            m_currSolutionIdx         = -1;
+            m_winnerSolutionIdx       = -1;
+            m_fastestGflops           = -1.0;
+            m_fasterTimeUS            = -1.0;
+            m_fastestTilesPerCu       = -1.0;
+            m_fastestTotalGranularity = -1.0;
+        }
+
         void ResultFileReporter::postSolution()
         {
             if (VICTOR_LOG)

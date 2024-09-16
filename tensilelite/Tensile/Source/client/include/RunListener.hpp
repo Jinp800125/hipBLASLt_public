@@ -73,6 +73,8 @@ namespace TensileLite
             /// Called at end of each problem.
             virtual void postProblem() = 0;
 
+            virtual void STEP2resetProblem() = 0;
+
             /***********
    * Solution
    ***********/

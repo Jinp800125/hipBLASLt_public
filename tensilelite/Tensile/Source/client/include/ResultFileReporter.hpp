@@ -62,6 +62,7 @@ namespace TensileLite
 
             virtual void postProblem() override;
             virtual void postSolution() override;
+            virtual void STEP2resetProblem() override;
 
             void finalizeReport() override;
 

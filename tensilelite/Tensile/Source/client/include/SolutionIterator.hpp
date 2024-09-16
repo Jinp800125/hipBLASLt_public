@@ -160,6 +160,7 @@ namespace TensileLite
 
             virtual void preProblem(ContractionProblem* const problem) override;
             virtual void postProblem() override;
+            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 0\n";};
 
             virtual void preSolution(ContractionSolution const& solution) override;
             virtual void postSolution() override;
@@ -196,6 +197,7 @@ namespace TensileLite
 
             virtual void preProblem(ContractionProblem* const problem) override;
             virtual void postProblem() override;
+            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 1\n";};
 
             virtual void preSolution(ContractionSolution const& solution) override;
             virtual void postSolution() override;
@@ -221,6 +223,7 @@ namespace TensileLite
 
             virtual void preProblem(ContractionProblem* const problem) override;
             virtual void postProblem() override;
+            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 2\n";};
 
             virtual void preSolution(ContractionSolution const& solution) override;
             virtual void postSolution() override;

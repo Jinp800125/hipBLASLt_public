@@ -55,6 +55,8 @@ namespace TensileLite
 
             virtual void postProblem() override;
 
+            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 5\n";};
+
             virtual void preSolution(ContractionSolution const& solution) override;
 
             virtual void postSolution() override;

@@ -392,6 +392,7 @@ namespace TensileLite
                 if(m_rowLevel <= m_level)
                     printf("++++++++++++++++++++++++\n");
             }
+            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 8\n";};
 
             virtual void finalizeReport() override {}
 

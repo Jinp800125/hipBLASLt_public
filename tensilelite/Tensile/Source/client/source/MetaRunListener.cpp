@@ -95,6 +95,14 @@ namespace TensileLite
                 (*iter)->postProblem();
         }
 
+        void MetaRunListener::STEP2resetProblem()
+        {
+            if (VICTOR_LOG)
+                std::cout << "STEP2resetProblem 6\n";
+            for(auto iter = m_listeners.rbegin(); iter != m_listeners.rend(); iter++)
+                (*iter)->STEP2resetProblem();
+        }
+
         void MetaRunListener::preSolution(ContractionSolution const& solution)
         {
             for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)

@@ -45,6 +45,16 @@ namespace TensileLite
             Count
         };
 
+        // class VICTOR
+        // {
+        //     public:
+        //         static int VICTOR_TUNNING = 1;
+        //         static int VICTOR_LOG = 1;
+        // };
+
+        // static int VICTOR_TUNNING = 0;
+        // static int VICTOR_LOG = 0;
+
         std::string   ToString(LogLevel level);
         std::ostream& operator<<(std::ostream& stream, LogLevel level);
         std::istream& operator>>(std::istream& stream, LogLevel& level);
@@ -224,6 +234,7 @@ namespace TensileLite
 
             virtual void preProblem(ContractionProblem* const problem) override {}
             virtual void postProblem() override {}
+            virtual void STEP2resetProblem() override {std::cout << "STEP2resetProblem 3\n";}
 
             virtual void preSolution(ContractionSolution const& solution) override {}
             virtual void postSolution() override {}

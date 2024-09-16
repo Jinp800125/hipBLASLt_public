@@ -64,6 +64,7 @@ namespace TensileLite
                                        std::vector<std::vector<size_t>> const& value) override;
 
             virtual void postProblem() override;
+            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 9\n";};
             virtual void postSolution() override;
 
             void finalizeReport() override;
