@@ -147,8 +147,8 @@ namespace TensileLite
             {
                 if (VICTOR_LOG)
                     std::cout << "STEP2resetProblem 7\n";
-                for(auto iter = m_reporters.rbegin(); iter != m_reporters.rend(); iter++)
-                    (*iter)->STEP2resetProblem();
+                // for(auto iter = m_reporters.rbegin(); iter != m_reporters.rend(); iter++)
+                //     (*iter)->STEP2resetProblem();
             }
 
             virtual void preSolution(ContractionSolution const& solution) override
@@ -275,6 +275,12 @@ namespace TensileLite
                 }
 
                 return 0;
+            }
+
+            virtual void getTop(std::vector<int64_t> &v_top, int top_want) override
+            {
+                for(auto iter = m_reporters.begin()+1; iter != m_reporters.end(); iter++)
+                    (*iter)->getTop(v_top, top_want);
             }
 
         private:

@@ -794,7 +794,7 @@ int main(int argc, const char* argv[])
                                 TimingEvents warmupStopEvents(warmupInvocations, warmupEventCount);
 
                                 listeners.preWarmup();
-                                for(int i = 0; i < warmupInvocations; i++)
+                                for(int i = 0; i < 1; i++)
                                 {
                                     size_t kIdx = i % kernels.size();
                                     HIP_CHECK_EXC(adapter.launchKernels(kernels[kIdx],
@@ -814,7 +814,7 @@ int main(int argc, const char* argv[])
 
                                 listeners.preSyncs();
                                 if(enq)
-                                    for(int i = 0; i < syncs; i++)
+                                    for(int i = 0; i < 1; i++)
                                     {
                                         TimingEvents startEvents(enq, eventCount);
                                         TimingEvents stopEvents(enq, eventCount);
@@ -868,14 +868,30 @@ int main(int argc, const char* argv[])
                         return std::min(listeners.error(), 255);
                     }
                 }
-                if (VICTOR_LOG)
-                    std::cout << "STEP1 END\n";
+                
+                int w_top = enq;
+                if (1)
+                    std::cout << "STEP1 END\n\nTOP " << w_top << "\n\n";
+
+                std::vector<int64_t> v_top;
+                reporters->getTop(v_top, w_top);
+                if (VICTOR_LOG) std::cout << "\n" << "v_top" << v_top << "\n";
+                // for (auto it = m_top.begin(); it != (m_top.begin()+2); it++) {
+                // // for (const auto& top : m_top) {
+                //     // std::cout << "\n" << "MAP" << top.first << " " << top.second << "\n";
+                //     for (const auto& sloIdx : it->second) {
+                //         std::cout << "\n" << "MAP" << top.first << " " << sloIdx << "\n";
+                //         v_top.push_back(sloIdx);
+                //     }
+                // }
                 listeners.STEP2resetProblem();
                 if (VICTOR_LOG)
                     std::cout << "CLEAR STEP1 RESULT\n";
-                // while(solutionIterator->moreSolutionsInProblem())
+                int solu_count = 0;
+                while(solu_count < v_top.size())
                 {
-                    auto solution = solutionIterator->getSolution(5);
+                    auto solution = solutionIterator->getSolution(v_top[solu_count]);
+                    solu_count++;
                     if(solution == nullptr)
                         throw std::runtime_error("Could not find a solution");
 

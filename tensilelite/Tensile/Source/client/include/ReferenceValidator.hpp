@@ -55,7 +55,7 @@ namespace TensileLite
 
             virtual void preProblem(ContractionProblem* const problem) override;
             virtual void postProblem() override;
-            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 4\n";};
+            virtual void STEP2resetProblem() override{if (VICTOR_LOG) std::cout << "STEP2resetProblem 4\n";};
 
             virtual void preSolution(ContractionSolution const& solution) override;
             virtual void postSolution() override;
@@ -121,6 +121,7 @@ namespace TensileLite
                               ContractionInputs const&      result);
 
             virtual void finalizeReport() override;
+            virtual void getTop(std::vector<int64_t> &v_top, int top_want) override {}
 
             virtual int error() const override;
 

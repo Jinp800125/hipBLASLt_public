@@ -392,9 +392,11 @@ namespace TensileLite
                 if(m_rowLevel <= m_level)
                     printf("++++++++++++++++++++++++\n");
             }
-            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 8\n";};
+            virtual void STEP2resetProblem() override{if (VICTOR_LOG) std::cout << "STEP2resetProblem 8\n";};
 
             virtual void finalizeReport() override {}
+
+            virtual void getTop(std::vector<int64_t> &v_top, int top_want) override {printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n"); m_winner   = std::numeric_limits<double>::infinity();}
 
         private:
             LogLevel m_level;

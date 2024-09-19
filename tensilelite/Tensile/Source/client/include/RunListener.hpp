@@ -127,6 +127,7 @@ namespace TensileLite
 
             /// Called at end of program execution.  Print out a summary of the runs.
             virtual void finalizeReport() = 0;
+            virtual void getTop(std::vector<int64_t> &v_top, int top_want) = 0;
 
             /// Called at end of program execution.  Return a non-zero value if a
             /// non-fatal error was previously recorded.

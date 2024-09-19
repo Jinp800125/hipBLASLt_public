@@ -120,6 +120,7 @@ namespace TensileLite
                         m_winnerSolutionIdx = m_currSolutionIdx;
                         m_fastestGflops     = gflops;
                     }
+                    m_top[gflops].push_back(m_currSolutionIdx);
                 }
             }
             else
@@ -290,6 +291,7 @@ namespace TensileLite
             m_fasterTimeUS            = -1.0;
             m_fastestTilesPerCu       = -1.0;
             m_fastestTotalGranularity = -1.0;
+            m_top.clear();
 
             if(!m_mergeSameProblems)
             {
@@ -343,5 +345,25 @@ namespace TensileLite
                 }
             }
         }
+
+        void ResultFileReporter::getTop(std::vector<int64_t> &v_top, int top_want)
+        {
+            if (VICTOR_LOG) std::cout << "\n" << "getTop" << "\n";
+            int idx;
+            auto it = m_top.begin();
+            for (it = m_top.begin(), idx=0; (it != m_top.end()) && idx<top_want; it++, idx++) {
+            // for (const auto& top : m_top) {
+                // std::cout << "\n" << "MAP" << top.first << " " << top.second << "\n";
+                for (const auto& sloIdx : it->second) {
+                    if (VICTOR_LOG) std::cout << "\n" << "MAP" << it->first << " " << sloIdx << "\n";
+                    v_top.push_back(sloIdx);
+                }
+            }
+        }
     } // namespace Client
 } // namespace TensileLite
+// virtual void getTop(std::vector<int64_t> &v_top) override
+//             {
+//                 for(auto iter = m_reporters.begin()+2; iter != m_reporters.end(); iter++)
+//                     (*iter)->getTop(v_top);
+//             }

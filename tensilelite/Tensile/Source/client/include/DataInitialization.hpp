@@ -803,7 +803,7 @@ namespace TensileLite
             virtual void postBenchmarkRun() override {}
             virtual void preProblem(ContractionProblem* const problem) override {}
             virtual void postProblem() override {}
-            virtual void STEP2resetProblem() override{std::cout << "STEP2resetProblem 11\n";};
+            virtual void STEP2resetProblem() override{if (VICTOR_LOG) std::cout << "STEP2resetProblem 11\n";};
             virtual void preSolution(ContractionSolution const& solution) override {}
             virtual void postSolution() override {}
             virtual bool needMoreRunsInSolution() const override
@@ -854,7 +854,12 @@ namespace TensileLite
             {
             }
 
-            virtual void finalizeReport() override {}
+<<<<<<< HEAD
+            virtual void finalizeReport() override{}
+=======
+            virtual void finalizeReport() override{};
+            virtual void getTop(std::vector<int64_t> &v_top, int top_want) override {};
+>>>>>>> 4e0c4816... TEST STEP3
 
             virtual int error() const override
             {

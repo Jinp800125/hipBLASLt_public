@@ -241,6 +241,11 @@ namespace TensileLite
             for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)
                 (*iter)->finalizeReport();
         }
+        void MetaRunListener::getTop(std::vector<int64_t> &v_top, int top_want)
+        {
+            // for(auto iter = m_listeners.begin(); iter != m_listeners.end(); iter++)
+            //     (*iter)->getTop(v_top, top_want);
+        }
 
         int MetaRunListener::error() const
         {
