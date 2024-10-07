@@ -288,7 +288,9 @@ namespace TensileLite
                                hipMemcpyDeviceToDevice);
                     m_gpuInit = true;
                 }
-                initializeGPUBatchedInputs(problem.gemms[0]);
+
+                if(!m_stridedBatched)
+                    initializeGPUBatchedInputs(problem.gemms[0]);
 
                 if(m_cpuPtrs.empty())
                     initializeConstantInputs(problem.gemms[0]);
@@ -369,7 +371,9 @@ namespace TensileLite
                     }
                     m_gpuInit = true;
                 }
-                initializeGPUBatchedInputs(problem);
+
+                if(!m_stridedBatched)
+                    initializeGPUBatchedInputs(problem);
 
                 if(m_cpuPtrs.empty())
                     initializeConstantInputs(problem);
