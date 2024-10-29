@@ -4464,11 +4464,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
       vgprIdx += 9 # for vgpr serial id
 
     self.states.totalVgprs = max(vgprIdx, self.states.c.numVgprValu)
-    if self.states.totalVgprs < 0 or self.states.totalVgprs > self.states.regCaps["MaxVgpr"]:
+    if self.states.totalVgprs < 0 or self.states.totalVgprs > self.states.regCaps["MaxVgpr"] and not self.debugConfig.forceGenerateKernel:
       raise RuntimeError("Generating asm kernel error: total vgpr: %u not in [0, %u].\n" % (self.states.totalVgprs, self.states.regCaps["MaxVgpr"]))
 
     agprLimit = self.states.regCaps["PhysicalMaxVgpr"] - self.states.regCaps["MaxVgpr"]
-    if self.states.totalAgprs > agprLimit:
+    if self.states.totalAgprs > agprLimit and not self.debugConfig.forceGenerateKernel:
       raise RuntimeError("Generating asm kernel error: total agpr: %u not in [0, %u].\n" % (self.states.totalAgprs, agprLimit) )
 
     ########################################
