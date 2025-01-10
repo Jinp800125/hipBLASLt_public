@@ -1560,33 +1560,6 @@ class KernelWriterAssembly(KernelWriter):
       module.add(SAddU32(dst=sgpr("WorkGroup0"), src0=sgpr(tmpSgpr0), src1=sgpr(tmpSgpr1)))
       self.vgprPool.checkIn(tmpVgpr)
 
-      tmpSgpr0 = tmpSgprRes.idx
-      tmpSgpr1 = tmpSgpr0+1
-      tmpSgpr2 = tmpSgpr1+1
-      tmpSgpr3 = tmpSgpr2+1
-      tmpSgpr4 = tmpSgpr3+1
-      tmpSgpr5 = tmpSgpr4+1
-      module.add(scalarStaticDivideAndRemainder(qReg=tmpSgpr4, rReg=tmpSgpr5, dReg="WorkGroup0", divisor=38, tmpSgprRes=tmpSgprRes, doRemainder=1))
-      module.add(SCmpGeU32(src0=sgpr(tmpSgpr5), src1=36))
-      module.add(SCBranchSCC1(label_skipWGMXCC.getLabelName()))
-      module.add(scalarStaticDivideAndRemainder(qReg=tmpSgpr3, rReg=tmpSgpr3, dReg=tmpSgprNumWorkGroups, divisor=4, tmpSgprRes=tmpSgprRes, doRemainder=0))
-      module.add(SMulI32(dst=sgpr(tmpSgpr3), src0=sgpr(tmpSgpr3), src1=4))
-      module.add(SCmpGeU32(src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr3)))
-      module.add(SCBranchSCC1(label_skipWGMXCC.getLabelName()))
-      module.add(SMulI32(dst=sgpr(tmpSgpr2), src0=sgpr(tmpSgpr4), src1=38))
-      module.add(scalarStaticDivideAndRemainder(qReg=tmpSgpr3, rReg=tmpSgpr3, dReg=tmpSgpr5, divisor=4, tmpSgprRes=tmpSgprRes, doRemainder=0))
-      module.add(SAddU32(dst=sgpr(tmpSgpr2), src0=sgpr(tmpSgpr2), src1=sgpr(tmpSgpr3)))
-      module.add(scalarStaticDivideAndRemainder(qReg=tmpSgpr4, rReg=tmpSgpr4, dReg=tmpSgprNumWorkGroups, divisor=38, tmpSgprRes=tmpSgprRes, doRemainder=0))
-      module.add(SMulI32(dst=sgpr(tmpSgpr4), src0=sgpr(tmpSgpr4), src1=38))
-      module.add(scalarStaticDivideAndRemainder(qReg=tmpSgpr5, rReg=tmpSgpr5, dReg=tmpSgpr5, divisor=4, tmpSgprRes=tmpSgprRes, doRemainder=2))
-      module.add(SSubU32(dst=sgpr(tmpSgpr3), src0=sgpr(tmpSgprNumWorkGroups), src1=sgpr(tmpSgpr4)))
-      module.add(scalarStaticDivideAndRemainder(qReg=tmpSgpr3, rReg=tmpSgpr3, dReg=tmpSgpr3, divisor=4, tmpSgprRes=tmpSgprRes, doRemainder=0))
-      module.add(SMulI32(dst=sgpr(tmpSgpr3), src0=sgpr(tmpSgpr3), src1=sgpr(tmpSgpr5)))
-      module.add(SMulI32(dst=sgpr(tmpSgpr5), src0=sgpr(tmpSgpr5), src1=9))
-      module.add(SCmpGtU32(src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr4)))
-      module.add(SCSelectB32(dst=sgpr(tmpSgpr3), src0=sgpr(tmpSgpr3), src1=sgpr(tmpSgpr5)))
-      module.add(SAddU32(dst=sgpr("WorkGroup0"), src0=sgpr(tmpSgpr2), src1=sgpr(tmpSgpr3)))
-
       module.add(label_skipWGMXCC)
     return module
 
