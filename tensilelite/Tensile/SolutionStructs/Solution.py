@@ -3213,6 +3213,9 @@ class Solution(collections.abc.Mapping):
     #   if state["ProblemType"]["SupportUserArgs"] and state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel':
     #     reject(state, printRejectionReason, "Currently SupportUserArgs does not support GSU > 1.")
 
+    if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel' and state["MIWaveTile"][0] * state["MIWaveGroup"][0] * state["MIWaveTile"][1] * state["MIWaveGroup"][1] == 1 and state["DepthU"] == int(16/state["ProblemType"]["DataType"].numRegisters()):
+      state["ForceDisableShadowInit"] = 1
+
     if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
       if state["NumElementsPerBatchStore"] == 1:
         reject(state, printRejectionReason, "too many store at MultipleBufferSingleKernel direct reject")
