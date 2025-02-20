@@ -402,9 +402,32 @@ class Solution(collections.abc.Mapping):
       state["tailLoopOptB"] = False
 
     if (state["DirectToVgprA"] == -1):
-      state["DirectToVgprA"] = True if (state['MIWaveGroup'][1] == 1 and state["MacroTile0"] * state["MacroTile1"] >= 57344) else False
+      # state["DirectToVgprA"] = True if (state['MIWaveGroup'][1] == 1 and state["MacroTile0"] * state["MacroTile1"] >= 57344) else False
+      # state["DirectToVgprA"] = True if state["MacroTile0"]*state["MacroTile1"] >= 256*16 else False
+      if state['MIWaveGroup'][1] == 1:
+        state["DirectToVgprA"] = True if state["MacroTile0"]>=state["MacroTile1"] else False
+      elif state['MIWaveGroup'][0] == 2 and state['MIWaveGroup'] == 2:
+        state["DirectToVgprA"] = True if abs(state["MacroTile0"] - state["MacroTile1"]) <= min(state["MacroTile0"], state["MacroTile1"]) else False
+      else:
+        state["DirectToVgprA"] = False
+      # if state["LocalSplitU"] > 1:
+      #   state["DirectToVgprA"] = False
+
+      state["DirectToVgprA"] = True if state["MacroTile0"]*state["MacroTile1"] >= 256*16 else False
+
     if (state["DirectToVgprB"] == -1):
-      state["DirectToVgprB"] = True if (state['MIWaveGroup'][0] == 1 and state["MacroTile0"] * state["MacroTile1"] >= 57344) else False
+      # state["DirectToVgprB"] = True if (state['MIWaveGroup'][0] == 1 and state["MacroTile0"] * state["MacroTile1"] >= 57344) else False
+      # state["DirectToVgprB"] = True if state["MacroTile0"]*state["MacroTile1"] >= 256*16 else False
+      if state['MIWaveGroup'][0] == 1:
+        state["DirectToVgprB"] = True if state["MacroTile0"]<=state["MacroTile1"] else False
+      elif state['MIWaveGroup'][0] == 2 and state['MIWaveGroup'] == 2:
+        state["DirectToVgprB"] = True if abs(state["MacroTile0"] - state["MacroTile1"]) <= min(state["MacroTile0"], state["MacroTile1"]) else False
+      else:
+        state["DirectToVgprB"] = False
+      # if state["LocalSplitU"] > 1:
+      #   state["DirectToVgprB"] = False
+
+      state["DirectToVgprB"] = True if state["MacroTile0"]*state["MacroTile1"] >= 256*16 else False
 
     if (state["DirectToVgprA"]):
       state["tailLoopOptA"] = False
@@ -741,11 +764,17 @@ class Solution(collections.abc.Mapping):
     if tc == 'A' and (state["ProblemType"]["TransposeA"] and state["ProblemType"]["TransposeB"]):
         # Use AssertSummationElementMultiple (BoundSizeMultiple in predicates) to exclude failed tail-loop cases
         state["AssertSummationElementMultiple"] = max(state["AssertSummationElementMultiple"], state["DepthU"])
+        if state["TunningSkip"] and state["AssertSummationElementMultiple"] != 1:
+          reject(state, "tunning gridbase DirectToVgpr%c does not supports tail."%(tc))
+          return False
 
     # for DTVB, does not work with NN and Tail-loop
     if  tc == 'B' and (not state["ProblemType"]["TransposeA"] and not state["ProblemType"]["TransposeB"]):
         # Use AssertSummationElementMultiple (BoundSizeMultiple in predicates) to exclude failed tail-loop cases
         state["AssertSummationElementMultiple"] = max(state["AssertSummationElementMultiple"], state["DepthU"])
+        if state["TunningSkip"] and state["AssertSummationElementMultiple"] != 1:
+          reject(state, "tunning gridbase DirectToVgpr%c does not supports tail."%(tc))
+          return False
 
     # Does not work with DirectToLDS
     # -> this will be checked after DirectToLDS doable check is done
@@ -999,7 +1028,7 @@ class Solution(collections.abc.Mapping):
       state["StreamKAtomic"] = 0
       state["StreamKXCCMapping"] = 0
       state["DebugStreamK"] = 0
-    
+    state["TunningSkip"] = 0
     if 1: ## for tunning
       state["TunningSkip"] = 1
     #   state["BatchSizeEqual"] = 1
@@ -2105,9 +2134,11 @@ class Solution(collections.abc.Mapping):
               or (state["ProblemType"]["Sparse"] and state["PrefetchGlobalRead"] > 0))):
         state["ExpandPointerSwap"] = 0
 
-    if state["GlobalReadVectorWidthA"] == 4 and state["GlobalReadVectorWidthB"] == 4 and state["DirectToVgprA"] != True and state["DirectToVgprB"] != True::
-      state["GlobalReadVectorWidthA"] = 2
-      state["GlobalReadVectorWidthB"] = 2
+    # DOWRDWidth = int(1/state["ProblemType"]["DataType"].numRegisters())
+    # DOWRD2Width = 2*DOWRDWidth
+    # if state["GlobalReadVectorWidthA"] == DOWRD2Width and state["GlobalReadVectorWidthB"] == DOWRD2Width and state["DirectToVgprA"] != True and state["DirectToVgprB"] != True and not (state["ProblemType"]["TransposeA"]): # if state["GlobalReadVectorWidthA"] == 4 and state["GlobalReadVectorWidthB"] == 4: #THIS
+      # state["GlobalReadVectorWidthA"] = DOWRDWidth
+      # state["GlobalReadVectorWidthB"] = DOWRDWidth
 
     # TN?
     # if state["DirectToVgprA"] == True and state["MIWaveTile"][1] == 32-4*state["MIWaveTile"][0]:
@@ -2697,6 +2728,12 @@ class Solution(collections.abc.Mapping):
 
     # print("ldsNumBytes", ldsNumBytes)
 
+    if state["GlobalSplitU"] > 1 and state["TunningSkip"]:
+      state["NonTemporalD"] = 0
+      state["WorkGroupMapping"] = 1
+      if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+        state["NumElementsPerBatchStore"] = 0
+
     if state["NumElementsPerBatchStore"] == -1:
       state["NumElementsPerBatchStore"] = (16 // state["MIWaveTile"][0]) * state["MIWaveTile"][0]
 
@@ -3247,7 +3284,10 @@ class Solution(collections.abc.Mapping):
     #   if state["ProblemType"]["SupportUserArgs"] and state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel':
     #     reject(state, printRejectionReason, "Currently SupportUserArgs does not support GSU > 1.")
 
-    if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel' and state["MIWaveTile"][0] * state["MIWaveGroup"][0] * state["MIWaveTile"][1] * state["MIWaveGroup"][1] == 1 and state["DepthU"] == int(16/state["ProblemType"]["DataType"].numRegisters()):
+    if state["GlobalSplitU"] > 1 and state["DepthU"] == int(16/state["ProblemType"]["DataType"].numRegisters()):
+      reject(state, "GSU skip DU <=", int(16/state["ProblemType"]["DataType"].numRegisters()))
+
+    if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel' and state["DepthU"] == int(16/state["ProblemType"]["DataType"].numRegisters()): #and state["MIWaveTile"][0] * state["MIWaveGroup"][0] * state["MIWaveTile"][1] * state["MIWaveGroup"][1] == 4 and
       state["ForceDisableShadowInit"] = 1
 
     if state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':

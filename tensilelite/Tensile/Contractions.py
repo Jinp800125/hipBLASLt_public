@@ -481,22 +481,37 @@ class ProblemPredicate(Properties.Predicate):
             valuepredicates.append(state["GlobalSplitU"])
             rv += [cls('WorkgroupNumberCheck', index=0, value=valuepredicates)]
         if "TunningSkip" in state:
-            valuepredicates = [];
-            valuepredicates.append(state["MacroTile0"])
-            valuepredicates.append(state["MacroTile1"])
-            valuepredicates.append(state['GlobalSplitU'])
-            valuepredicates.append(state["MIWaveGroup"][0]*state["MIWaveGroup"][1])
-            valuepredicates.append(state['LdsNumBytes'])
-            valuepredicates.append(state['DepthU'])
+            if state["TunningSkip"]:
+                valuepredicates = [];
+                valuepredicates.append(state["MacroTile0"])
+                valuepredicates.append(state["MacroTile1"])
+                valuepredicates.append(state['GlobalSplitU'])
+                valuepredicates.append(state["MIWaveGroup"][0]*state["MIWaveGroup"][1])
+                valuepredicates.append(state['LdsNumBytes'])
+                valuepredicates.append(state['DepthU'])
 
-            if state["_GlobalAccumulation"] == 'SingleBuffer':
-                valuepredicates.append(0)
-            elif state["_GlobalAccumulation"] == 'MultipleBuffer':
-                valuepredicates.append(1)
-            elif state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
-                valuepredicates.append(2)
-            
-            rv += [cls('TunningSkip', index=0, value=valuepredicates)]
+                if state["_GlobalAccumulation"] == 'SingleBuffer':
+                    valuepredicates.append(0)
+                elif state["_GlobalAccumulation"] == 'MultipleBuffer':
+                    valuepredicates.append(1)
+                elif state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+                    valuepredicates.append(2)
+                
+                valuepredicates.append(state['NonTemporalA'])
+                valuepredicates.append(state['NonTemporalB'])
+                valuepredicates.append(state['ProblemType']['TransposeA'])
+                valuepredicates.append(state['ProblemType']['TransposeB'])
+                
+                if state['DirectToVgprA']:
+                    valuepredicates.append(1)
+                else:
+                    valuepredicates.append(0)
+                if state['DirectToVgprB']:
+                    valuepredicates.append(1)
+                else:
+                    valuepredicates.append(0)
+                
+                rv += [cls('TunningSkip', index=0, value=valuepredicates)]
 
         if not problemType.aType.isInt8x4():
             # calculate the minimum supported free dimension size

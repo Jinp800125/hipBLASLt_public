@@ -274,10 +274,10 @@ namespace TensileLite
                     HasValue = true
                 };
                 size_t             index;
-                std::array<int, 7> value;
+                std::array<int, 13> value;
 
                 TunningSkip() = default;
-                TunningSkip(size_t index, std::array<int, 7> value)
+                TunningSkip(size_t index, std::array<int, 13> value)
                     : index(index)
                     , value(value)
                 {
@@ -308,12 +308,19 @@ namespace TensileLite
                     int LdsNumBytes = value[4];
                     int DU = value[5];
                     int GSUA = value[6];
+                    int NTA = value[7];
+                    int NTB = value[8];
+                    int TransA = value[9];
+                    int TransB = value[10];
+                    int DTVA = value[11];
+                    int DTVB = value[12];
 
                     // bool ret = (MT0 <= (std::ceil(std::ceil(problem.d().sizes()[0]/16.0)/4)*4)*16) 
                     //         && (MT1 <= (std::ceil(std::ceil(problem.d().sizes()[1]/16.0)/4)*4)*16);
                     // bool ret = true;
-                    bool ret = (MT0 <= std::pow(2,std::ceil(log2(problem.d().sizes()[0]))))
-                            && (MT1 <= std::pow(2,std::ceil(log2(problem.d().sizes()[1]))));
+                    int MINMT = 16;
+                    bool ret = (MT0 <= max(std::pow(2,std::ceil(log2(problem.d().sizes()[0]))), MINMT))
+                            && (MT1 <= max(std::pow(2,std::ceil(log2(problem.d().sizes()[1]))), MINMT));
 
                     size_t minK
                         = (problem.getParams().gsu() > 0 ? problem.getParams().gsu() : GSU);
@@ -341,12 +348,23 @@ namespace TensileLite
                     // // if (DU >= 1024)
                     //     ret = ret && (LdsNumBytes >= 32768);
 
+                    // if ((TransA==1 && TransB==0) && (DTVA || DTVB))
+                    //     ret = ret && ((MT0*MT1) > 256*224);
+
+                    if (NTA)
+                    // if (problem.d().sizes()[1]<=MT1)
+                        ret = ret && (problem.d().sizes()[1]<=MT1);
+                    if (NTB)
+                    // if (problem.d().sizes()[0]<=MT0)
+                        ret = ret && (problem.d().sizes()[0]<=MT0);
+
                     float occupancy = 256*256*304*1.0;
                     int tmp6 = std::ceil((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy);
                     int tmp6_floor = max(1, std::floor((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy));
 
                     float occupancy_small = 512*512;
-                    int tmp6_floor_small = std::floor((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy_small);
+                    // int tmp6_floor_small = std::floor((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy_small);
+                    float tmp6_floor_small = (problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy_small;
                     if (GSU > 1)
                         ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (1*tmp6));
                     else
@@ -374,14 +392,19 @@ namespace TensileLite
                             float a=(GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304;
                             std::stringstream ss;
                             ss.setf(std::ios::fixed);
-                            ss.precision(1);
+                            ss.precision(3);
                             ss << a;
                             
                             float c = atof(ss.str().c_str());
+                            // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (512*128))
                             if (problem.d().sizes()[0]*problem.d().sizes()[1] > (512*512))
                                 ret = ret && (((c) / std::ceil(c)) >= 1-(0.5/tmp6_floor));
                             else
                                 ret = ret && (((c) / std::ceil(c)) >= (tmp6_floor_small/2));
+
+                            // if GSU>1
+                            //     ret = ret && (((c) / std::ceil(c)) >= 1-(0.5/(tmp6_floor_small/2))*4);
+
                             // ? ret = ret && ((((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5);
                             // if ((GSUA == 2) && (GSU > 1))
                             //     ret = ret && ((std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1)) >= 32);
@@ -392,6 +415,9 @@ namespace TensileLite
                          if ((GSUA == 2) && (GSU > 1))
                             ret = ret && ((std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1)) >= 32);
                     }
+
+                    if ((GSUA == 1) && (GSU > 1))
+                            ret = ret && ((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1)) >= 32);
 
                     return ret;
                 }

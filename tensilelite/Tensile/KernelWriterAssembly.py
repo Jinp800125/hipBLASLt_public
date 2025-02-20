@@ -3710,6 +3710,7 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["LocalSplitU"] > 1:
         # allocate resources
         wave_id    = self.vgprPool.checkOut(1) # quotient
+        tmpVgpr    = self.vgprPool.checkOut(1) # quotient
         # constant
         lsu         = kernel["LocalSplitU"]
         du          = kernel["DepthU"]
@@ -3723,6 +3724,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(VAddU32(dst=vgpr(qReg), src0=vgpr(wave_id), src1=vgpr(qReg), \
           comment="LSU Offset: offset += lsuoffset" ))
         self.vgprPool.checkIn(wave_id)
+        self.vgprPool.checkIn(tmpVgpr)
 
     else:
       module.add(vectorStaticDivideAndRemainder(qReg, rReg, dividendReg, divisor, tmpVgprRes))
