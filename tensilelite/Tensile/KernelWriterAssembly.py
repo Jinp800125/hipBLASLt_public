@@ -155,7 +155,8 @@ class KernelWriterAssembly(KernelWriter):
       code = self._getCustomKernelSource(kernel, CUSTOM_KERNEL_PATH) if isCustomKernelConfig(kernel) else self._getKernelSource(kernel)
       errcode = 0
     except RuntimeError as e:
-      printWarning(f"Failed to generate assembly source code for {kernel}: {e}")
+      if self.debugConfig.printSolutionRejectionReason:
+        printWarning(f"Failed to generate assembly source code for {kernel}: {e}")
       code = ""
       errcode = -2
     return (errcode, code)
@@ -603,10 +604,6 @@ class KernelWriterAssembly(KernelWriter):
     numDummySgpr= 0
     for i in range(numDummySgpr):
       module.add(self.defineSgpr("DummySgpr%d"%i, 1))
-
-    if self.sgprPool.size() > self.states.regCaps["MaxSgpr"]:
-      print ("warning: Number of defined SGPRS (%d) overflowed max SGPRS (%d)." \
-               % (self.sgprPool.size(), self.states.regCaps["MaxSgpr"]))
 
     # End of define sgprs
     #------------------------
