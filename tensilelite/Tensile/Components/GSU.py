@@ -705,13 +705,13 @@ class GSUOn(GSU):
 
         indices = list(range(0, kernel["ProblemType"]["NumIndicesC"]))
         numDim = len(indices)
-        with writer.allocTmpSgpr(5) as tmpSgprInfo:
+        with writer.allocTmpSgpr(4) as tmpSgprInfo:
             tmpSgpr = tmpSgprInfo.idx
             module.addModuleAsFlatItems(writer.s_mul_u64_u32(sgpr(tmpSgpr+0), sgpr(tmpSgpr+1), sgpr("SizesFree+0"), 1, tmpVgpr, "Free0"))
             for i in range(1, numDim):
-                module.add(SSubU32(dst=sgpr(tmpSgpr+4), src0=sgpr("SizesFree+%u"%i), src1=1, comment="Free%u" % i))
-                module.add(SMulI32(dst=sgpr(tmpSgpr+4), src0=sgpr(tmpSgpr+4), src1=1, comment="Free%u" % i))
-                module.addModuleAsFlatItems(writer.s_mul_u64_u32(sgpr(tmpSgpr+2), sgpr(tmpSgpr+3), sgpr(tmpSgpr+4), sgpr("StrideC%s"%writer.states.indexChars[i]), tmpVgpr, "Free%u" % i))
+                module.add(SSubU32(dst=sgpr(tmpSgpr+2), src0=sgpr("SizesFree+%u"%i), src1=1, comment="Free%u" % i))
+                module.add(SMulI32(dst=sgpr(tmpSgpr+2), src0=sgpr(tmpSgpr+2), src1=1, comment="Free%u" % i))
+                module.addModuleAsFlatItems(writer.s_mul_u64_u32(sgpr(tmpSgpr+2), sgpr(tmpSgpr+3), sgpr(tmpSgpr+2), sgpr("StrideC%s"%writer.states.indexChars[i]), tmpVgpr, "Free%u" % i))
                 module.add(SAddU32(dst=sgpr(tmpSgpr+0), src0=sgpr(tmpSgpr+0), src1=sgpr(tmpSgpr+2), comment="Free%u" % i))
                 module.add(SAddCU32(dst=sgpr(tmpSgpr+1), src0=sgpr(tmpSgpr+1), src1=sgpr(tmpSgpr+3), comment="Free%u" % i))
 
