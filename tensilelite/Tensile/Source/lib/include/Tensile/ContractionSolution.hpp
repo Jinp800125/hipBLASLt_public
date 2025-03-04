@@ -156,6 +156,15 @@ namespace TensileLite
         int MathClocksUnrolledLoop = 0;
 
         size_t synchronizerSizePerWG = 0;
+
+        int NonTemporalA = 0;
+        int NonTemporalB = 0;
+        int NonTemporalD = 0;
+        int WaveSeparateGlobalReadA = 0;
+        int WaveSeparateGlobalReadB = 0;
+        int UnrollLoopSwapGlobalReadOrder = 0;
+        bool DirectToVgprA = false;
+        bool DirectToVgprB = false;
     };
 
     /**
@@ -257,7 +266,9 @@ namespace TensileLite
         {
             Granularities granularities;
 
+            double microSeconds = 0.0;
             double speedGFlops = 0.0; //! final gflops projection
+            double hitRate = 0.0;
             int    CUs         = 0;
 
             StaticPerformanceModel staticModel;
@@ -274,6 +285,13 @@ namespace TensileLite
             double M;
             double N;
             double K;
+        };
+
+        struct L2CacheHitRate
+        {
+            double tile0HitRate          = 0.0;
+            double tile1HitRate          = 0.0;
+            double totalHitRate          = 0.0;
         };
 
         bool checkInternalArgumentsSupport(ContractionProblem const& problem,
@@ -295,6 +313,20 @@ namespace TensileLite
         size_t partialTileSize(size_t skGrid) const;
 
         static float computeGranularity(float x);
+
+        L2CacheHitRate computeL2CacheHitRate(uint32_t M,
+                                             uint32_t N,
+                                             uint32_t K,
+                                             uint32_t NumCUs,
+                                             uint32_t NumXCDs,
+                                             uint32_t gsu,
+                                             int32_t  wgm,
+                                             uint32_t batches,
+                                             uint32_t bpeA,
+                                             uint32_t bpeB,
+                                             int32_t  NTA,
+                                             int32_t  NTB,
+                                             bool     isGSUWGMRR) const;
 
         Granularities computeGranularities(
             Hardware const& hardware, double M, double N, double K, double NumBatches) const;
@@ -326,6 +358,12 @@ namespace TensileLite
    * Calculate the projected performance based on granularity loss.
    */
         ProjectedPerformance projectedPerformance(Problem const&  problem,
+                                                  Hardware const& hardware) const;
+
+        /**
+   * Predict the projected performance.
+   */
+        ProjectedPerformance predictedPerformance(Problem const&  problem,
                                                   Hardware const& hardware) const;
 
         /**

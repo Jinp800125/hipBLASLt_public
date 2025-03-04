@@ -87,7 +87,6 @@ class KernelCodeGenResult(NamedTuple):
     isa: IsaVersion
     wavefrontSize: int
     cuoccupancy: int
-    pgr: int
     mathclk: int
 
 
@@ -102,11 +101,10 @@ def processKernelSource(kernelWriterAssembly, data, splitGSU, kernel) -> KernelC
     err, src = kernelWriter.getSourceFileString(kernel)
     header = kernelWriter.getHeaderFileString(kernel)
     objFilename = kernel._state.get("codeObjectFile", None)
-    pgr = int(kernel["PrefetchGlobalRead"])
     return KernelCodeGenResult(
         err, src, header, asmFilename, objFilename, tuple(kernel["ISA"]), \
         kernel["WavefrontSize"], kernel["CUOccupancy"], \
-        pgr, kernel["MathClocksUnrolledLoop"]
+        kernel["MathClocksUnrolledLoop"],
     )
 
 
@@ -168,8 +166,48 @@ def passPostKernelInfoToSolution(results, kernels, solutions, splitGSU: bool):
             kName = getKeyNoInternalArgs(kernel, splitGSU)
             result = resultDict["%s"%kName]
             solution._state["CUOccupancy"] = result.cuoccupancy
-            solution._state["PrefetchGlobalRead"] = result.pgr
             solution._state["MathClocksUnrolledLoop"] = result.mathclk
+
+def passPostKernelInfoToLibrary(results, kernels, masterLibraries, splitGSU: bool):
+    resultDict = {}
+    for kernIdx, r in enumerate(results):
+        kName = getKeyNoInternalArgs(kernels[kernIdx], splitGSU)
+        resultDict["%s"%kName] = r
+    for _, masterLibrary in masterLibraries.items():
+        for _, sol in masterLibrary.solutions.items():
+            solutionKernels = sol.originalSolution.getKernels()
+            for kernel in solutionKernels:
+                kName = getKeyNoInternalArgs(kernel, splitGSU)
+                result = resultDict["%s"%kName]
+                sol.sizeMapping.CUOccupancy = result.cuoccupancy
+                sol.sizeMapping.MathClocksUnrolledLoop = result.mathclk
+                sol.sizeMapping.PrefetchGlobalRead = sol.originalSolution._state['PrefetchGlobalRead']
+                sol.sizeMapping.NonTemporalA = sol.originalSolution._state['NonTemporalA']
+                sol.sizeMapping.NonTemporalB = sol.originalSolution._state['NonTemporalB']
+                sol.sizeMapping.NonTemporalD = sol.originalSolution._state['NonTemporalD']
+                sol.sizeMapping.WaveSeparateGlobalReadA = sol.originalSolution._state['WaveSeparateGlobalReadA']
+                sol.sizeMapping.WaveSeparateGlobalReadB = sol.originalSolution._state['WaveSeparateGlobalReadB']
+                sol.sizeMapping.UnrollLoopSwapGlobalReadOrder = sol.originalSolution._state['UnrollLoopSwapGlobalReadOrder']
+                sol.sizeMapping.DirectToVgprA = bool(sol.originalSolution._state['DirectToVgprA'])
+                sol.sizeMapping.DirectToVgprB = bool(sol.originalSolution._state['DirectToVgprB'])
+        masterLibrary.lazyLibraries = dict(sorted(masterLibrary.lazyLibraries.items()))
+        for name, lib in masterLibrary.lazyLibraries.items():
+            for _, sol in lib.solutions.items():
+                solutionKernels = sol.originalSolution.getKernels()
+                for kernel in solutionKernels:
+                    kName = getKeyNoInternalArgs(kernel, splitGSU)
+                    result = resultDict["%s"%kName]
+                    sol.sizeMapping.CUOccupancy = result.cuoccupancy
+                    sol.sizeMapping.MathClocksUnrolledLoop = result.mathclk
+                    sol.sizeMapping.PrefetchGlobalRead = sol.originalSolution._state['PrefetchGlobalRead']
+                    sol.sizeMapping.NonTemporalA = sol.originalSolution._state['NonTemporalA']
+                    sol.sizeMapping.NonTemporalB = sol.originalSolution._state['NonTemporalB']
+                    sol.sizeMapping.NonTemporalD = sol.originalSolution._state['NonTemporalD']
+                    sol.sizeMapping.WaveSeparateGlobalReadA = sol.originalSolution._state['WaveSeparateGlobalReadA']
+                    sol.sizeMapping.WaveSeparateGlobalReadB = sol.originalSolution._state['WaveSeparateGlobalReadB']
+                    sol.sizeMapping.UnrollLoopSwapGlobalReadOrder = sol.originalSolution._state['UnrollLoopSwapGlobalReadOrder']
+                    sol.sizeMapping.DirectToVgprA = bool(sol.originalSolution._state['DirectToVgprA'])
+                    sol.sizeMapping.DirectToVgprB = bool(sol.originalSolution._state['DirectToVgprB'])
 
 def writeAssembly(asmPath: Union[Path, str], result: KernelCodeGenResult):
     if result.err:
@@ -376,9 +414,16 @@ def writeSolutionsAndKernelsTCL(
         rocisa.rocIsa.getInstance().getData(),
         splitGSU,
     )
-
     unaryWriteAssembly = functools.partial(writeAssembly, assemblyTmpPath)
-    compose = lambda *F: functools.reduce(lambda f, g: lambda x: f(g(x)), F)
+
+    def compose(assemble, unaryWriteAssembly, unaryProcessKernelSource):
+        def composed_function(kernel):
+            processed_kernel = unaryProcessKernelSource(kernel)
+            written_kernel = unaryWriteAssembly(processed_kernel)
+            assembled_kernel = assemble(written_kernel)
+            return assembled_kernel, processed_kernel
+        return composed_function
+
     ret = ParallelMap2(
         compose(assemble, unaryWriteAssembly, unaryProcessKernelSource),
         uniqueAsmKernels,
@@ -386,6 +431,11 @@ def writeSolutionsAndKernelsTCL(
         multiArg=False,
         return_as="list"
     )
+
+    results = []
+    for r, processed_kernel in ret:
+        results.append(processed_kernel)
+
     buildAssemblyCodeObjectFiles(
         asmToolchain.linker,
         asmToolchain.bundler,
@@ -408,7 +458,7 @@ def writeSolutionsAndKernelsTCL(
         cmdlineArchs,
     )
 
-    return len(uniqueAsmKernels)
+    return len(uniqueAsmKernels), uniqueAsmKernels, results
 
 
 @timing
@@ -688,7 +738,7 @@ def run():
     copyStaticFiles(outputPath)
 
     start_wsk = timer()
-    numKernels = writeSolutionsAndKernelsTCL(
+    numKernels, uniqueKernels, kernelInfo = writeSolutionsAndKernelsTCL(
         outputPath,
         asmToolchain,
         srcToolchain,
@@ -701,13 +751,15 @@ def run():
     stop_wsk = timer()
     print(f"Time to generate kernels (s): {(stop_wsk-start_wsk):3.2f}")
 
+    splitGSU = False
+    passPostKernelInfoToLibrary(kernelInfo, uniqueKernels, masterLibraries, splitGSU)
+
     archs = [ # is this really different than the other archs above?
         isaToGfx(arch)
         for arch in targetIsas
         if isaInfoMap[arch].asmCaps["SupportedISA"]
     ]
     newLibraryDir = ensurePath(os.path.join(outputPath, "library"))
-    splitGSU = False
 
     def writeMsl(name, lib):
         filename = os.path.join(newLibraryDir, name)
@@ -715,6 +767,7 @@ def run():
         LibraryIO.write(filename, state(lib), arguments["LibraryFormat"])
 
     start_msl = timer()
+
     for archName, newMasterLibrary in masterLibraries.items():
         if archName in archs:
             if arguments["LazyLibraryLoading"]:

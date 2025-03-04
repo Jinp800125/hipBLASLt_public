@@ -589,7 +589,15 @@ class SizeMapping:
                  'CUOccupancy',
                  'PrefetchGlobalRead',
                  'MathClocksUnrolledLoop',
-                 'synchronizerSizePerWG'
+                 'synchronizerSizePerWG',
+                 'NonTemporalA',
+                 'NonTemporalB',
+                 'NonTemporalD',
+                 'WaveSeparateGlobalReadA',
+                 'WaveSeparateGlobalReadB',
+                 'UnrollLoopSwapGlobalReadOrder',
+                 'DirectToVgprA',
+                 'DirectToVgprB',
                  ]
 
     @classmethod
@@ -604,6 +612,8 @@ class SizeMapping:
         if d['_GlobalAccumulation'] == 'PartialsBuffer':
             globalAccum = 4
         pgr = int(d['PrefetchGlobalRead'])
+        dtva = False if d['DirectToVgprA'] == 0 else True
+        dtvb = False if d['DirectToVgprB'] == 0 else True
         synchronizerSizePerWG = ceil((d['MIWaveTile'][0]*d['MIWaveTile'][1] if d['EnableMatrixInstruction'] else d['ThreadTile0']*d['ThreadTile1']        \
                                     * ceil((d['NumElementsPerThread'])/d['NumElementsPerBatchStore']) if d['NumElementsPerBatchStore'] != 0 else 1        \
                                     * ceil(d["NumThreads"] / d["WavefrontSize"])))
@@ -641,7 +651,15 @@ class SizeMapping:
                    CUOccupancy              = d['CUOccupancy'],
                    PrefetchGlobalRead       = pgr,
                    MathClocksUnrolledLoop   = d['MathClocksUnrolledLoop'],
-                   synchronizerSizePerWG    = synchronizerSizePerWG
+                   synchronizerSizePerWG    = synchronizerSizePerWG,
+                   NonTemporalA             = d['NonTemporalA'],
+                   NonTemporalB             = d['NonTemporalB'],
+                   NonTemporalD             = d['NonTemporalD'],
+                   WaveSeparateGlobalReadA  = d['WaveSeparateGlobalReadA'],
+                   WaveSeparateGlobalReadB  = d['WaveSeparateGlobalReadB'],
+                   UnrollLoopSwapGlobalReadOrder = d['UnrollLoopSwapGlobalReadOrder'],
+                   DirectToVgprA = dtva,
+                   DirectToVgprB = dtvb,
                    )
     @classmethod
     def ReadOriginalMacroTile(cls, d):

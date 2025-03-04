@@ -3251,6 +3251,712 @@ namespace TensileLite
         return granularities;
     }
 
+    static double getPrefetchPerformance(int pgr, int grvwa, int grvwb, int bpeA, int bpeB, uint32_t depthU, int waveNum, double MT0, double MT1, double math_frequency, double mem_latency, int numAccPerWave)
+    {
+        const double others = 220 + numAccPerWave * 4;
+        int stallA = 4;
+        int lwA = 8;
+        switch(grvwa * bpeA)
+        {
+        case 16:
+            stallA = 25;
+            lwA = 20;
+            break;
+        case 8:
+            stallA = 18;
+            lwA = 12;
+            break;
+        case 4:
+            stallA = 8;
+            lwA = 8;
+            break;
+        default:
+            stallA = 4;
+            lwA = 8;
+        }
+        int stallB = 4;
+        int lwB = 1;
+        switch(grvwb * bpeB)
+        {
+        case 16:
+            stallB = 25;
+            lwB = 20;
+            break;
+        case 8:
+            stallB = 18;
+            lwB = 12;
+            break;
+        case 4:
+            stallB = 8;
+            lwB = 8;
+            break;
+        default:
+            stallB = 4;
+            lwB = 8;
+        }
+
+        int numGRA = MT0 * depthU * bpeA / (waveNum * 64) / grvwa;
+        int numGRB = MT1 * depthU * bpeB / (waveNum * 64) / grvwb;
+
+        //issue 2nd prefetch
+        double grCycles2 = numGRA * 4 / waveNum;
+        grCycles2       += numGRB * 4 / waveNum;
+
+        if(pgr >= 2)
+        {
+            double grCycles = 0.0;
+            if(numGRA + numGRB > 16)
+            {
+                grCycles = 16 * 4;
+                auto extraGR = numGRA + numGRB - 16;
+                if(numGRA > 16)
+                {
+                    //issue GRA
+                    grCycles += stallA * (numGRA - 16);
+                }
+                //issue GRB
+                if(numGRB <= 16)
+                {
+                    grCycles += stallA * numGRB;
+                }
+                else
+                {
+                    grCycles += stallA * 16;
+                    grCycles += stallB * (16 - numGRB);
+                }
+            }
+            else
+            {
+                grCycles = (numGRA + numGRB) * 4 * (waveNum / 2);
+            }
+
+            //issue local write
+            double lrCycles = numGRA * lwA / waveNum;
+            lrCycles       += numGRB * lwB / waveNum;
+
+            double perf = std::max((grCycles + others) / math_frequency, mem_latency) + (lrCycles + grCycles2) / math_frequency;
+            //std::cout<<"grCycles, others, math_frequency="<<grCycles<<","<<others<<","<<math_frequency<<""<<std::endl;
+
+        }
+        return (grCycles2 + others) / math_frequency;
+    }
+
+    static double ceiling_math(double value, double significance = 1) {
+        return std::ceil(value / significance) * significance;
+    }
+
+    static double calculateStoreL3Request(double M, double N, double MT0, double MT1, double &non_edge_req, double &edge_req) {
+        double result = 0.0;
+
+        double C115 = M;
+        double F115 = MT0;
+        double D115 = N;
+
+        double edge_size = std::fmod(C115, F115);
+        double numWGsNonEdge = std::floor(C115 / F115);
+        result = D115 * (
+            (numWGsNonEdge * ceiling_math(F115 / 32)) +
+            ceiling_math(edge_size / 32)
+        );
+
+        double maxMT1 = std::min(N, MT1);
+        double nonEdgeRequestPerMT = maxMT1 * (ceiling_math(F115 / 32));
+        double edgeRequestPerMT = maxMT1 * ceiling_math(edge_size / 32);
+        if(numWGsNonEdge > 0.0)
+            non_edge_req = nonEdgeRequestPerMT;
+        else
+            non_edge_req = 0;
+        edge_req     = edgeRequestPerMT;
+
+        return result;
+    }
+
+    static double calculateStoreL2Request(double M, double N, double MT0, double MT1, double SVW, double &non_edge_req, double &edge_req) {
+        double result = 0.0;
+
+        double D115 = N;
+        double C115 = M;
+        double F115 = MT0;
+        double G115 = SVW;
+
+        double edge_size = std::fmod(C115, F115);
+        double numWGsNonEdge = std::floor(C115 / F115);
+        double M_MOD_16SVW = std::fmod(C115, 16 * G115);
+
+        double non_edge_0 = F115 * 2 / 64 * ceiling_math(64 / (16 * 2 * G115));
+        double edge_0 = (ceiling_math(std::floor(edge_size / (16 * G115)) * (16 * G115) * 2 / 64 * ceiling_math(64 / (16 * 2 * G115))) * G115);
+        double edge_1 = (std::floor(M_MOD_16SVW * 2 / 64 * ceiling_math(64 / (16 * 2 * G115))) * std::min(M_MOD_16SVW, G115));
+        double edge_2 = (std::min(std::fmod(C115, std::min(16 * G115, 32.0)), G115));
+
+        result = D115 * (
+            (numWGsNonEdge * non_edge_0) +
+            (edge_0) +
+            (edge_1) +
+            (edge_2)
+        );
+
+        double maxMT1 = std::min(N, MT1);
+        double nonEdgeRequestPerMT = maxMT1 * (non_edge_0);
+        double edgeRequestPerMT = maxMT1 * (edge_0 + edge_1 + edge_2);
+        if(numWGsNonEdge > 0.0)
+            non_edge_req = nonEdgeRequestPerMT;
+        else
+            non_edge_req = 0;
+        edge_req     = edgeRequestPerMT;
+
+        return result;
+    }
+
+    static double calculateStoreL1Request(double M, double N, double MT0, double MT1, double SVW, double &non_edge_req, double &edge_req) {
+        double result = 0.0;
+        double D115 = N;
+        double C115 = M;
+        double F115 = MT0;
+        double G115 = SVW;
+
+        double edge_size = std::fmod(C115, F115);
+        double numWGsNonEdge = std::floor(C115 / F115);
+
+        double non_edge_0 = F115 / 16 * (-1) * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 4) == 2 ? 1 : 0);
+        double non_edge_1 = F115 / 16 * (-4) * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 16) == 8 ? 1 : 0);
+        double non_edge_2 = F115 / 16 * (-3) * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 4) == 0 ? 1 : 0);
+        double non_edge_3 = F115 / 16 * (-12) * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 16) == 0 ? 1 : 0);
+        double edge_0 = (std::floor(edge_size / (16 * G115)) * 3 * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 2) == 1 ? 1 : 0));
+        double edge_1 = (std::floor(edge_size / (16 * G115)) * 2 * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 4) == 2 ? 1 : 0));
+        double edge_2 = (std::floor(edge_size / (16 * G115)) * (-4) * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 8) == 0 ? 1 : 0));
+        double edge_3 = (std::floor(edge_size / (16 * G115)) * 4 * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 16) == 0 ? 1 : 0));
+        double edge_4 = (std::floor(edge_size / (16 * G115)) * (-12 * G115 * G115) * (G115 == 1 ? 1 : 0) * (std::fmod(C115, 16) == 0 ? 1 : 0));
+
+        result += D115 / 64 * (
+            (numWGsNonEdge * non_edge_0) +
+            (numWGsNonEdge * non_edge_1) +
+            (numWGsNonEdge * non_edge_2) +
+            (numWGsNonEdge * non_edge_3) +
+            (edge_0) +
+            (edge_1) +
+            (edge_2) +
+            (edge_3) +
+            (edge_4)
+        );
+
+        double non_edge_4 = F115 / 32 * (G115 == 2 || G115 == 8 ? 139 : (G115 == 4 ? 82 : 0)) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 2) == 1 ? 1 : 0);
+        double non_edge_5 = F115 / 16 * (G115 == 2 || G115 == 8 ? 3 : (G115 == 4 ? 2 : 0)) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 4) == 2 ? 1 : 0);
+        double non_edge_6 = F115 / 16 * (G115 == 2 || G115 == 8 ? 2 : (G115 == 4 ? 0 : 0)) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 8) == 4 ? 1 : 0);
+        double non_edge_7 = F115 / 16 * (G115 == 2 || G115 == 8 ? 4 : (G115 == 4 ? 0 : 0)) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 16) == 8 ? 1 : 0);
+        double non_edge_8 = F115 / 16 * (-4) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 8) == 0 ? 1 : 0);
+        double non_edge_9 = F115 / 16 * (G115 == 4 || G115 == 8 ? 0 : (G115 == 2 ? -8 : 0)) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 16 * G115) == 0 ? 1 : 0);
+        double non_edge_10 =  F115 / 16 * (G115 == 4 || G115 == 8 ? -8 : (G115 == 2 ? 0 : 0)) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 4 * G115) == 0 ? 1 : 0);
+        double edge_5 = (std::floor(edge_size / (16 * G115)) * (-16 * G115 * G115) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 16 * G115) == 8 * G115 ? 1 : 0));
+        double edge_6 = (std::floor(edge_size / (16 * G115)) * (-48 * G115 * G115) * (G115 == 1 ? 0 : 1) * (std::fmod(C115, 16 * G115) == 0 ? 1 : 0));
+
+        result += D115 / 64 * (
+            (numWGsNonEdge * non_edge_4) +
+            (numWGsNonEdge * non_edge_5) +
+            (numWGsNonEdge * non_edge_6) +
+            (numWGsNonEdge * non_edge_7) +
+            (numWGsNonEdge * non_edge_8) +
+            (numWGsNonEdge * non_edge_9) +
+            (numWGsNonEdge * non_edge_10) +
+            (edge_5) +
+            (edge_6)
+        );
+
+        double M_MOD_16SVW = std::fmod(C115, 16 * G115);
+        double M_MOD_8VW   = std::fmod(C115, 8 * G115);
+        double M_MOD_4SVW  = std::fmod(C115, 4 * G115);
+        double M_MOD_4     = std::fmod(C115, 4);
+
+        double non_edge_11 = F115 / 16 * (16 - (G115 == 1 ? 1 : 4));
+        double edge_7 = (std::floor(edge_size / (16 * G115)) * (12 * G115 * G115) * (G115 == 1 ? 1 : 4));
+        double edge_8 = ((M_MOD_16SVW >= 4 * G115 ? (M_MOD_16SVW - 4 * G115) * G115 * (G115 == 1 && M_MOD_4 == 0 ? 1 : 4) * (M_MOD_8VW == 0 ? 0 : 1) : 0));
+
+        result += D115 / 64 * (
+            (numWGsNonEdge * non_edge_11) +
+            (edge_7) +
+            (edge_8)
+        );
+
+        double non_edge_12 = ((F115 * 2) / 64) * (G115 == 1 || G115 == 4 ? 2 : 1);
+        double edge_9 = (std::floor(edge_size / (16 * G115)) * (G115 == 1 ? 1 : 4 * G115));
+        double edge_10 = (M_MOD_16SVW < 4 * G115 ? M_MOD_4SVW : 0);
+        double edge_11 = (M_MOD_16SVW >= 4 * G115 ? (G115 == 1 && M_MOD_4 == 0 ? 1 : 4 * G115) : 0);
+
+        result += D115 * (
+            (numWGsNonEdge * non_edge_12) +
+            (edge_9) +
+            (edge_10) +
+            (edge_11)
+        );
+
+        double maxMT1 = std::min(N, MT1);
+        double nonEdgeRequestPerMT = maxMT1 / 64 * (non_edge_0 + non_edge_1 + non_edge_2 + non_edge_3 + non_edge_4 + non_edge_5 + non_edge_6 + non_edge_7 +
+                                                    non_edge_8 + non_edge_9 + non_edge_10 + non_edge_11) +
+                                     (maxMT1 * non_edge_12);
+        double edgeRequestPerMT = maxMT1 / 64 * (edge_0 + edge_1 + edge_2 + edge_3 + edge_4 + edge_5 + edge_6 + edge_7 + edge_8) +
+                                  maxMT1 * (edge_9 + edge_10 + edge_11);
+
+        if(numWGsNonEdge > 0.0)
+            non_edge_req = nonEdgeRequestPerMT;
+        else
+            non_edge_req = 0;
+        edge_req     = edgeRequestPerMT;
+
+        return result;
+    }
+
+    static double getLoadRequest(double MTX, double DU, double L1CacheLineSize, uint32_t grvw, uint32_t bpe, int dtv, double &tcc_ea0_coalscedA)
+    {
+        double L1_req = 0.0;
+        tcc_ea0_coalscedA = 1;
+        if(dtv == 0)
+        {
+            L1_req = MTX * DU * bpe / 64;
+            if(DU * bpe < L1CacheLineSize)
+            {
+                // for DU32
+                //std::cout<<"DU32 : L1_req *= "<<L1CacheLineSize / (DU * bpe)<<std::endl;
+                L1_req *= L1CacheLineSize / (DU * bpe);
+                tcc_ea0_coalscedA = 2;
+            }
+            if(grvw * bpe == 8 || grvw * bpe <= 2)
+            {
+                //std::cout<<"dwordx2 : L1_req *= 2"<<std::endl;
+                // for dwordx2 and short
+                L1_req *= 2;
+            }
+        }
+        else
+        {
+            // dtv
+            L1_req = MTX * DU * bpe / 64 * (DU / grvw);
+            if(DU > 32)
+                L1_req /= 2;
+        }
+        return L1_req;
+    }
+
+    static double getTCPEfficiency(double DU, double K, double bpe, double L1HteRate)
+    {
+        double TCPEff = 1.0;
+        double TCP_tagrams_width = 512;
+        double K_byte = K * bpe;
+        double K_mod_512 = std::fmod(K_byte, TCP_tagrams_width); // 4 bank. 128B per bank.
+        double DU_byte = DU * bpe;
+        if(K_mod_512 == 0)
+        {
+            // 512 bytes aligned
+            if(DU_byte < 512)
+            {
+                TCPEff = std::max(0.25, DU_byte / 512);
+            }
+        }
+        else if(K_mod_512 == 256)
+        {
+            // 256 bytes aligned
+            if(DU_byte < 256)
+            {
+                TCPEff = std::max(0.5, DU_byte / 256);
+            }
+        }
+        //std::cout<<"TCPEff = "<<TCPEff<<std::endl;
+        double TCPDowngradeByHitRate = 1; //std::max(0.0, std::min(0.8, 0.8 - L1HteRate * 2));
+        double TCPFormula = (1+(1-TCPDowngradeByHitRate)*(TCPEff-1)-TCPDowngradeByHitRate*(TCPEff-1)*(TCPEff-1));
+        return TCPFormula;
+    }
+
+    ContractionSolution::ProjectedPerformance
+        ContractionSolution::predictedPerformance(Problem const&  problem,
+                                                  Hardware const& hardware) const
+    {
+        ProjectedPerformance pp;
+        double M = 1.0, N = 1.0;
+        if(problem.freeIndicesA().size() > 1 || sizeMapping.packBatchDims & 0x1)
+        {
+            std::vector<size_t> packedIndices
+                = generatePackedIndicesA(problem, sizeMapping.packBatchDims);
+            for(auto pi = packedIndices.begin(); pi != packedIndices.end(); pi++)
+                M *= problem.a().sizes()[*pi];
+        }
+        else
+            M = problem.freeSizeA(0);
+
+        if(problem.freeIndicesB().size() > 1 || sizeMapping.packBatchDims & 0x2)
+        {
+            std::vector<size_t> packedIndices
+                = generatePackedIndicesB(problem, sizeMapping.packBatchDims);
+            for(auto pi = packedIndices.begin(); pi != packedIndices.end(); pi++)
+                N *= problem.b().sizes()[*pi];
+        }
+        else
+            N = problem.freeSizeB(0);
+
+        double NumBatches = 1;
+        if(sizeMapping.packBatchDims == 0)
+        {
+            for(size_t i = 0; i < problem.batchIndices().size(); i++)
+                NumBatches *= problem.batchSize(i);
+        }
+        double K = problem.boundSize(0); // TODO - fix for multiple summations
+
+        AMDGPU const* pAMDGPU = dynamic_cast<AMDGPU const*>(&hardware);
+        assert(pAMDGPU);
+        //std::cout<<"=======sizeMapping=========="<<std::endl;
+
+        double NumCUs = pAMDGPU->computeUnitCount;
+        double wavefrontSize = pAMDGPU->wavefrontSize;
+        double MT0    = sizeMapping.macroTile.x;
+        double MT1    = sizeMapping.macroTile.y;
+        double   GlobalSplitU    = sizeMapping.globalSplitU;
+        double   math_clk        = sizeMapping.MathClocksUnrolledLoop; //MT0 * MT1 * 2 * depthU / flopsPerClk;
+        int      WGM             = sizeMapping.workGroupMapping != 0 ? sizeMapping.workGroupMapping : 1;
+        int      CUOccupancy     = sizeMapping.CUOccupancy;
+        int      PGR             = sizeMapping.PrefetchGlobalRead;
+        uint32_t depthU          = sizeMapping.depthU;
+        bool     isGSUWGMRR      = sizeMapping.globalSplitUWorkGroupMappingRoundRobin;
+#define ENABLE_NON_TEMPORAL
+#ifdef ENABLE_NON_TEMPORAL
+        int      NTA             = sizeMapping.NonTemporalA;
+        int      NTB             = sizeMapping.NonTemporalB;
+        int      NTD             = sizeMapping.NonTemporalD;
+#else
+        int      NTA             = 0;
+        int      NTB             = 0;
+        int      NTD             = 0;
+#endif
+        int      WSGRA           = sizeMapping.WaveSeparateGlobalReadA;
+        int      WSGRB           = sizeMapping.WaveSeparateGlobalReadB;
+        int      ULSGRO          = sizeMapping.UnrollLoopSwapGlobalReadOrder;
+        uint32_t GRVWA           = sizeMapping.grvwA;
+        uint32_t GRVWB           = sizeMapping.grvwB;
+        uint32_t GWVWD           = sizeMapping.gwvwD;
+        uint32_t waveNum         = sizeMapping.waveNum;
+        int      miSize          = sizeMapping.matrixInstruction[0];
+        bool     DTVA            = sizeMapping.DirectToVgprA;
+        bool     DTVB            = sizeMapping.DirectToVgprB;
+
+        //std::cout<<"DTVA         =          "<<DTVA<<std::endl;
+        //std::cout<<"DTVB         =          "<<DTVB<<std::endl;
+        //std::cout<<"MT0          =          "<<MT0<<std::endl;
+        //std::cout<<"MT1          =          "<<MT1<<std::endl;
+        //std::cout<<"GlobalSplitU =          "<<GlobalSplitU<<std::endl;
+        //std::cout<<"math_clk     =          "<<math_clk<<std::endl;
+        //std::cout<<"WGM          =          "<<WGM<<std::endl;
+        //std::cout<<"CUOccupancy  =          "<<CUOccupancy<<std::endl;
+        //std::cout<<"depthU       =          "<<depthU<<std::endl;
+        //std::cout<<"PGR          =          "<<PGR<<std::endl;
+        //std::cout<<"NTA          =          "<<NTA<<std::endl;
+        //std::cout<<"NTB          =          "<<NTB<<std::endl;
+        //std::cout<<"NTD          =          "<<NTD<<std::endl;
+        //std::cout<<"WSGRA        =          "<<WSGRA<<std::endl;
+        //std::cout<<"WSGRB        =          "<<WSGRB<<std::endl;
+        //std::cout<<"ULSGRO       =          "<<ULSGRO<<std::endl;
+        //std::cout<<"GWVWD        =          "<<GWVWD<<std::endl;
+        //std::cout<<"miSize       =          "<<miSize<<std::endl;
+
+        // double IdealGranularityPerf = closestKPerformance;
+
+        // pp.staticModel = staticPerformanceModel(
+        //     M, N, K, NumBatches, MT0, MT1, NumCUs, pp.granularities.totalGranularity, GlobalSplitU);
+
+        // pp.speedGFlops = IdealGranularityPerf * pp.granularities.totalGranularity;
+        // pp.CUs         = NumCUs;
+
+        // test only code
+        double L1CacheCapacity   = 32 * 1024; //bytes/clk
+        double L1CacheLineSize   = 128; //bytes/clk
+        double L2CacheLineSize   = 128;
+        double L1BusWidthPerCU  = 64; //bytes/clk
+        double L2BusWidthPerCU  = 128; //bytes/clk
+        double L1WriteBusWidthPerCU = 64; //bytes/clk
+        double L2WriteBusWidthPerCU = 64; //bytes/clk
+        double maxBandWidthHBM   = 3.0; //TB/s
+        double mem_frequency     = 1300; //1300;//MHz
+        double hbmBandWidth      = maxBandWidthHBM * 1000000 / mem_frequency;
+        double L3BandWidth       = 6.0 * 1000000 / mem_frequency;
+        double math_frequency    = 1100; //1100; //MHz
+        double initialCost       = 4.0; //us
+        double flopsPerClk       = 2048;
+        math_clk = std::max(math_clk, (double)MT0 * MT1 * 2 * depthU / flopsPerClk);
+
+        uint32_t NumXCDs         = 8;
+        uint32_t bpeA            = problem.a().elementBytes();
+        uint32_t bpeB            = problem.b().elementBytes();
+        uint32_t bpeD            = problem.d().elementBytes();
+
+        if(bpeA == 1 && bpeB == 1)
+        {
+            // F8 cases
+            flopsPerClk = 4096;
+        }
+
+        double totalOps = M * N * NumBatches * K * 2 / 1000000;
+
+        double K_AfterGSU = CeilDivide(K, GlobalSplitU);
+
+        int M_WGs_total = CeilDivide(M, MT0);
+        int N_WGs_total = CeilDivide(N, MT1);
+
+        int N_WGs_per_tile_XCD = std::min(WGM,N_WGs_total);
+        int M_WGs_per_tile_XCD = std::min(M_WGs_total,CeilDivide(int(NumCUs/8), N_WGs_per_tile_XCD));
+        int M_WGs_per_tile = std::min(M_WGs_total,CeilDivide(int(NumCUs), N_WGs_per_tile_XCD));
+        int N_WGs_per_tile = std::min(N_WGs_total, N_WGs_per_tile_XCD * CeilDivide(M_WGs_per_tile, M_WGs_total));
+
+        double A_L1_hit = 0.0;
+        double B_L1_hit = 0.0;
+        double A_L2_hit = 0.0;
+        double B_L2_hit = 0.0;
+        double A_L3_hit = 0.0;
+        double B_L3_hit = 0.0;
+        double best_L2_hit = 0.5;
+        uint32_t loopCnt = K_AfterGSU / depthU;
+        uint32_t K_loop = loopCnt * depthU;
+        uint32_t K_tail = K_AfterGSU - K_loop;
+        uint32_t numberWGs = M_WGs_total * N_WGs_total * NumBatches * GlobalSplitU;
+        uint32_t WGs_per_tile = std::min(uint32_t(NumCUs), numberWGs);
+        uint32_t WGs_per_tile_XCD = WGs_per_tile / NumXCDs;
+        uint32_t num_tiles = CeilDivide(numberWGs, uint32_t(NumCUs));
+        //double store = M * N * NumBatches * bpeD / maxBandWidthHBM / 1000000 / num_tiles;
+
+        double D_L1_req = 0.0;
+        double D_L2_req = 0.0;
+        double D_L3_req = 0.0;
+        double D_L1_edge_req, D_L2_edge_req, D_L3_edge_req;
+        double total_store_req1 = calculateStoreL1Request(M, N, MT0, MT1, GWVWD, D_L1_req, D_L1_edge_req);
+        double total_store_req2 = calculateStoreL2Request(M, N, MT0, MT1, GWVWD, D_L2_req, D_L2_edge_req);
+        double total_store_req3 = calculateStoreL3Request(M, N, MT0, MT1, D_L3_req, D_L3_edge_req);
+
+        // std::cout<<"store L1 non-edge= "<<D_L1_req<<std::endl;
+        // std::cout<<"store L1 edge    = "<<D_L1_edge_req<<std::endl;
+        // std::cout<<"store L2 non-edge= "<<D_L2_req<<std::endl;
+        // std::cout<<"store L2 edge    = "<<D_L2_edge_req<<std::endl;
+        // std::cout<<"store L3 non-edge= "<<D_L3_req<<std::endl;
+        // std::cout<<"store L3 edge    = "<<D_L3_edge_req<<std::endl;
+        // std::cout<<"store L1 request = "<<total_store_req1<<std::endl;
+        // std::cout<<"store L2 request = "<<total_store_req2<<std::endl;
+        // std::cout<<"store L3 request = "<<total_store_req3<<std::endl;
+
+        double L2WriteBandWidthPerCU = 0.58 * 128 * 16 / WGs_per_tile_XCD; //58% eff
+        double L2BandWidthPerCU = 0.9 * 128 * 16 / WGs_per_tile_XCD; //90% eff
+        double L3BandWidthPerCU = L3BandWidth / WGs_per_tile;
+        double HBMBandWidthPerCU = hbmBandWidth / WGs_per_tile;
+        double D_L1_clk = D_L1_req * 64 / L1WriteBusWidthPerCU;
+        double D_L2_clk = D_L2_req * 64 / std::min(L2WriteBusWidthPerCU, L2WriteBandWidthPerCU);
+        double D_L3_clk = D_L3_req* 64 / L3BandWidthPerCU;
+        // TODO: D_hbm_clk use D_L3_req.
+        double D_hbm_clk = 0 * 64 / HBMBandWidthPerCU;
+        double D_L1_clk_edge = D_L1_edge_req * 64 / L1WriteBusWidthPerCU;
+        double D_L2_clk_edge = D_L2_edge_req * 64 / std::min(L2WriteBusWidthPerCU, L2WriteBandWidthPerCU);
+        double D_L3_clk_edge = D_L3_edge_req * 64 / L3BandWidthPerCU;
+        double D_hbm_clk_edge = 0 * 64 / HBMBandWidthPerCU;
+        double D_L1_clk_total = total_store_req1 * 64 / L1WriteBusWidthPerCU;
+        double D_L2_clk_total = total_store_req2 * 64 / std::min(L2WriteBusWidthPerCU, L2WriteBandWidthPerCU);
+        double D_L3_clk_total = total_store_req3 * 64 / L3BandWidthPerCU;
+        double D_hbm_clk_total = 0 * 64 / HBMBandWidthPerCU;
+
+        double store_edge_overall = ((D_L1_clk_edge + D_L2_clk_edge) / math_frequency) + ((D_L3_clk_edge + D_hbm_clk_edge) / mem_frequency);
+        double store_non_edge_overall = ((D_L1_clk + D_L2_clk) / math_frequency) + ((D_L3_clk + D_hbm_clk) / mem_frequency);
+        double store_total = ((D_L1_clk_total + D_L2_clk_total) / math_frequency) + ((D_L3_clk_total + D_hbm_clk_total) / mem_frequency);
+        // Use the max of edge/non-edge store
+        double store = std::max(store_edge_overall, store_non_edge_overall);
+        // Use the average store
+        //double store = store_total / numberWGs;
+        // std::cout<<"store_edge_overall = "<<store_edge_overall<<std::endl;
+        // std::cout<<"store_non_edge_overall = "<<store_non_edge_overall<<std::endl;
+        // std::cout<<"D_L1_clk = "<<D_L1_clk<<std::endl;
+        // std::cout<<"D_L2_clk = "<<D_L2_clk<<std::endl;
+        // std::cout<<"D_L3_clk = "<<D_L3_clk<<std::endl;
+        // std::cout<<"D_hbm_clk= "<<D_hbm_clk<<std::endl;
+
+        uint32_t gsuMethod = sizeMapping.globalAccumulation;
+        double gsu_overall = 0.0;
+        if(gsuMethod == 2 && GlobalSplitU > 1) //MB
+        {
+            double GSU_load = (GlobalSplitU * M * N * 4 * NumBatches) / hbmBandWidth / NumCUs;
+            double GSU_store = (M * N * bpeD * NumBatches) / hbmBandWidth / NumCUs;
+            gsu_overall = initialCost + GSU_load + GSU_store;
+        }
+        else if(gsuMethod == 3 && GlobalSplitU > 1) //MBSK
+        {
+            // FIXME: Modify with the MBSK changes.
+            // FIXME: add sync overhead.
+            double atomic_overhead = GlobalSplitU * 0.15;
+            double GSU_L1_req = ((GlobalSplitU - 1) * MT0 * MT1 * 4) / 64;
+            double GSU_L1_clk = GSU_L1_req * 64 / L1BusWidthPerCU;
+            double GSU_L2_clk = GSU_L1_req/2 * 128 / std::min(L2BandWidthPerCU, L2BusWidthPerCU);
+            gsu_overall = atomic_overhead + (GlobalSplitU * store) + std::min(store_edge_overall, store_non_edge_overall);
+        }
+        
+        // Calculate L1 hit rate, assume bpeA==bpeB, TN only
+        bool isL1BypassA = (NTA >= 2);
+        bool isL1BypassB = (NTB >= 2);
+        if(depthU * bpeA < L1CacheLineSize)
+        {
+            uint32_t dataToL1A = isL1BypassA ? 0 : MT0 * L1CacheLineSize;
+            uint32_t dataToL1B = isL1BypassB ? 0 : MT1 * L1CacheLineSize;
+            if((dataToL1A + dataToL1B) <= L1CacheCapacity)
+            {
+                A_L1_hit = isL1BypassA ? 0 : (1 - (depthU * bpeA / L1CacheLineSize));
+                B_L1_hit = isL1BypassB ? 0 : (1 - (depthU * bpeB / L1CacheLineSize));
+            }
+            else
+            {
+                A_L1_hit = isL1BypassA ? 0 : (1 - (depthU * bpeA / L1CacheLineSize)) * (L1CacheCapacity / (dataToL1A + dataToL1B));
+                B_L1_hit = isL1BypassB ? 0 : (1 - (depthU * bpeB / L1CacheLineSize)) * (L1CacheCapacity / (dataToL1A + dataToL1B));
+            }
+        }
+
+        L2CacheHitRate L2_hit_rate = computeL2CacheHitRate(M, N, K_AfterGSU, NumCUs, NumXCDs, GlobalSplitU, WGM, NumBatches, bpeA, bpeB, NTA, NTB, isGSUWGMRR);
+
+        A_L2_hit = L2_hit_rate.tile0HitRate;
+        B_L2_hit = L2_hit_rate.tile1HitRate;
+
+        double A_L2_hit_henry = 0.0;
+        double B_L2_hit_henry = 0.0;
+
+        bool isL3BypassA = (NTA > 3) || (NTA == 1);
+        if (!isL3BypassA)
+        {
+            if ((M * K * bpeA) + (N * K * bpeB) < 256 * 1024 * 1024)
+            {
+                A_L3_hit = 1 - double(1.0 / N_WGs_total);
+            }
+            else
+            {
+                A_L3_hit = 1 - double(M_WGs_per_tile / NumCUs);
+            }
+        }
+        bool isL3BypassB = (NTB > 3) || (NTB == 1);
+        if (!isL3BypassB)
+        {
+            if ((M * K * bpeA) + (N * K * bpeB) < 256 * 1024 * 1024)
+            {
+                B_L3_hit = 1 - double(1.0 / M_WGs_total);
+            }
+            else
+            {
+                B_L3_hit = 1 - double(N_WGs_per_tile / NumCUs);
+            }
+        }
+
+        double tcc_ea0_coalscedA;
+        double tcc_ea0_coalscedB;
+        double A_L1_req = getLoadRequest(MT0, depthU, L1CacheLineSize, GRVWA, bpeA, DTVA, tcc_ea0_coalscedA);
+        double B_L1_req = getLoadRequest(MT1, depthU, L1CacheLineSize, GRVWB, bpeB, DTVB, tcc_ea0_coalscedB);
+
+        double A_L1_clk = A_L1_req * 64 / L1BusWidthPerCU;
+        double A_L2_clk = A_L1_req/2 * 128 * (1 - A_L1_hit) / std::min(L2BandWidthPerCU, L2BusWidthPerCU);
+        double A_L3_clk = A_L1_req/2 / tcc_ea0_coalscedA * 128 * (1 - A_L1_hit) * (1 - A_L2_hit) / L3BandWidthPerCU;
+        double A_hbm_clk = A_L1_req/2 * 128 * (1 - A_L1_hit) * (1 - A_L2_hit) * (1 - A_L3_hit) / HBMBandWidthPerCU;
+
+        double B_L1_clk = B_L1_req * 64 / L1BusWidthPerCU;
+        double B_L2_clk = B_L1_req/2 * 128 * (1 - B_L1_hit) / std::min(L2BandWidthPerCU, L2BusWidthPerCU);
+        double B_L3_clk = B_L1_req/2 / tcc_ea0_coalscedB * 128 * (1 - B_L1_hit) * (1 - B_L2_hit) / L3BandWidthPerCU;
+        double B_hbm_clk = B_L1_req/2 * 128 * (1 - B_L1_hit) * (1 - B_L2_hit) * (1 - B_L3_hit) / HBMBandWidthPerCU;
+
+        double L1_overall = (A_L1_clk + B_L1_clk) / math_frequency;
+        double L2_overall = (A_L2_clk + B_L2_clk) / math_frequency;
+        double L3_overall = (A_L3_clk + B_L3_clk) / mem_frequency;
+        double hbm_overall = (A_hbm_clk + B_hbm_clk) / mem_frequency;
+        double math_overall = math_clk / math_frequency;
+
+        double L1_hit = (A_L1_hit * MT0 + B_L1_hit * MT1) / (MT0 + MT1);
+        double TCP_efficiency = getTCPEfficiency(depthU, K, bpeA, L1_hit); //assume bpeA=bpeB.
+        //double mem_overall = L1_overall + L2_overall + L3_overall + hbm_overall; //old method
+        double mem_overall = (L1_overall * (1 - L1_hit) / TCP_efficiency) +
+                             (L2_overall * 0.3) +
+                             (L3_overall * (1 - L2_hit_rate.totalHitRate)) +
+                             (hbm_overall * 0.1);
+
+        double loop_overall = 0.0;
+        if(PGR > 1 && loopCnt > 0)
+            loop_overall = std::max(math_overall, mem_overall) * (loopCnt - 1) + (math_overall);
+        else
+            loop_overall = std::max(math_overall, mem_overall) * loopCnt;
+
+        double prefetch_mem = mem_overall;
+        int numAccPerWave   = MT0 * MT1 / waveNum / wavefrontSize;
+        double prefetch     = getPrefetchPerformance(PGR, GRVWA, GRVWB, bpeA, bpeB, depthU, waveNum, MT0, MT1, math_frequency, prefetch_mem, numAccPerWave);
+        initialCost        += prefetch;
+
+        double perf = (initialCost + loop_overall + store);
+
+        // tail loop
+        double tail_overall = 0.0;
+        if(K_tail > 0)
+        {
+            // FIXME: need to add GR + LR + MAC.
+            tail_overall = (mem_overall + math_overall);
+            perf += tail_overall;
+        }
+
+        //apply num_tiles
+        if(num_tiles > 1 && CUOccupancy >= 2)
+        {
+            perf = (initialCost + loop_overall + tail_overall + std::max(loop_overall + tail_overall, store)) * (num_tiles - 1) + store;
+        }
+        else if(num_tiles > 1)
+        {
+            perf *= num_tiles;
+        }
+
+        // GSU reduction part
+        perf += gsu_overall;
+
+        //remove unsupported kernels.
+        if(sizeMapping.workGroupMappingXCC != 8 ||
+           NTA > 0 ||
+           NTB > 0)
+           perf = 9999999; //std::numeric_limits<double>::max();
+
+        pp.microSeconds = perf;
+        //This is debug code
+        double L2_hit_henry = (A_L2_hit_henry * MT0 + B_L2_hit_henry * MT1) / (double)(MT0 + MT1);
+        //std::cout<<"Henry_Name("<<kernelName<<".kd),L2CacheHitRate("<<L2_hit_henry*100<<")"<<std::endl;
+        //std::cout<<"Menghung_Name("<<kernelName<<".kd),L2CacheHitRate("<<L2_hit_rate.totalHitRate*100<<")"<<std::endl;
+        //std::cout<<"Kernel_Name("<<kernelName<<".kd),MathClocks("<<math_clk<<")"<<"MFMA("<<MT0 * MT1 * 2 * depthU / flopsPerClk<<")"<<std::endl;
+
+        pp.hitRate = L2_hit_rate.totalHitRate*100; //L2_hit_rate.totalHitRate*100;
+#if 0
+        std::cout<<"MT0               =          "<<MT0<<std::endl;
+        std::cout<<"MT1               =          "<<MT1<<std::endl;
+        std::cout<<"depthU            =          "<<depthU<<std::endl;
+        std::cout<<"NumCUs            =          "<<NumCUs<<std::endl;
+        std::cout<<"WorkGroupMapping  =          "<<WGM<<std::endl;
+        std::cout<<"CUOccupancy       =          "<<CUOccupancy<<std::endl;
+        std::cout<<"loopCnt           =          "<<loopCnt<<std::endl;
+        std::cout<<"flopsPerClk       =          "<<flopsPerClk<<std::endl;
+        std::cout<<"Total L1_req      =          "<<(A_L1_req+B_L1_req)<<std::endl;
+        std::cout<<"TCP_efficiency    =          "<<TCP_efficiency<<std::endl;
+        std::cout<<"A_L1_hit          =          "<<A_L1_hit<<std::endl;
+        std::cout<<"B_L1_hit          =          "<<B_L1_hit<<std::endl;
+        std::cout<<"A_L2_hit          =          "<<A_L2_hit<<std::endl;
+        std::cout<<"B_L2_hit          =          "<<B_L2_hit<<std::endl;
+        std::cout<<"overall L2 Hit    =          "<<L2_hit_rate.totalHitRate<<std::endl;
+        std::cout<<"A_L3_hit          =          "<<A_L3_hit<<std::endl;
+        std::cout<<"B_L3_hit          =          "<<B_L3_hit<<std::endl;
+        std::cout<<"math_clk          =          "<<math_clk<<std::endl;
+        std::cout<<"L1_overall        =          "<<L1_overall<<std::endl;
+        std::cout<<"L2_overall        =          "<<L2_overall<<std::endl;
+        std::cout<<"L3_overall        =          "<<L3_overall<<std::endl;
+        std::cout<<"hbm_overall       =          "<<hbm_overall<<std::endl;
+        std::cout<<"mem_overall       =          "<<mem_overall<<std::endl;
+        std::cout<<"math_overall      =          "<<math_overall<<std::endl;
+        std::cout<<"tail_overall      =          "<<tail_overall<<std::endl;
+        std::cout<<"M_WGs_total       =          "<<M_WGs_total<<std::endl;
+        std::cout<<"N_WGs_total       =          "<<N_WGs_total<<std::endl;
+        std::cout<<"K_loop            =          "<<K_loop<<std::endl;
+        std::cout<<"K_tail            =          "<<K_tail<<std::endl;
+        std::cout<<"loop_overall      =          "<<loop_overall<<std::endl;
+        std::cout<<"initialCost       =          "<<initialCost<<std::endl;
+        std::cout<<"prefetch          =          "<<prefetch<<std::endl;
+        std::cout<<"store             =          "<<store<<std::endl;
+        std::cout<<"gsu_overall       =          "<<gsu_overall<<std::endl;
+        std::cout<<"num_tiles         =          "<<num_tiles<<std::endl;
+        std::cout<<"=================="<<perf<<" us"<<std::endl;
+#endif
+        return pp;
+    }
+
     ContractionSolution::ProjectedPerformance
         ContractionSolution::projectedPerformance(Problem const&  problem,
                                                   Hardware const& hardware) const
@@ -3319,6 +4025,361 @@ namespace TensileLite
         pp.CUs         = NumCUs;
 
         return pp;
+    }
+
+    ContractionSolution::L2CacheHitRate ContractionSolution::computeL2CacheHitRate(uint32_t M,
+                                                                                   uint32_t N,
+                                                                                   uint32_t K,
+                                                                                   uint32_t NumCUs,
+                                                                                   uint32_t NumXCDs,
+                                                                                   uint32_t gsu,
+                                                                                   int32_t  wgm,
+                                                                                   uint32_t batches,
+                                                                                   uint32_t bpeA,
+                                                                                   uint32_t bpeB,
+                                                                                   int32_t  NTA,
+                                                                                   int32_t  NTB,
+                                                                                   bool     isGSUWGMRR) const
+    {
+        ContractionSolution::L2CacheHitRate hitRate;
+
+        uint32_t MT0 = sizeMapping.macroTile.x;
+        uint32_t MT1 = sizeMapping.macroTile.y;
+
+        uint32_t wg0 = CeilDivide(M, MT0);
+        uint32_t wg1 = CeilDivide(N, MT1);
+
+        uint32_t MT0_Edge = MT0 - ((wg0 * MT0) - M);
+        uint32_t MT1_Edge = MT1 - ((wg1 * MT1) - N);
+        if(MT0_Edge == 0)
+            MT0_Edge = MT0;
+        if(MT1_Edge == 0)
+            MT1_Edge = MT1;
+
+        //std::cout<<"wgm="<<wgm<<",wg0="<<wg0<<", wg1 = "<<wg1<<", MT0 = "<<MT0<<", MT1 = "<<MT1<<", MT0_edge = "<<MT0_Edge<<", MT1_edge = "<<MT1_Edge<<std::endl;
+
+        // other info
+        uint32_t L2CacheLineSize = 128; //Bytes
+        uint32_t L2Capacity      = 4 * 1024 * 1024;   //MBs
+        uint32_t depthU          = sizeMapping.depthU;
+        uint32_t gsuMulBatch     = gsu * batches;
+
+        std::vector<uint32_t> arrA(gsuMulBatch*wg0, 0);
+        std::vector<uint32_t> arrB(gsuMulBatch*wg1, 0);
+        std::vector<uint32_t> arrA_2(gsuMulBatch*wg0, 0);
+        std::vector<uint32_t> arrB_2(gsuMulBatch*wg1, 0);
+
+        uint32_t WGMXCC  = NumXCDs;
+        uint32_t WGMXCCG = NumCUs;
+        assert((WGMXCCG % WGMXCC) == 0);
+
+        uint32_t xccIdx      = 0;
+        uint32_t score       = 0;
+        uint32_t totalWGNum  = gsuMulBatch * wg0 * wg1;
+        uint32_t totalWG0WG1 = wg0 * wg1;
+        uint32_t xccgdiv     = totalWGNum / WGMXCCG;
+        uint32_t xccgres     = totalWGNum % WGMXCCG;
+
+        // wgm list
+        //std::vector<int32_t> wgmList = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}; //,-1,-2,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12,-13,-14,-15,-16};
+        //int32_t wgm = wgmList[0];
+
+        double hitRateA     = 0;
+        double hitRateB     = 0;
+        double totalHitRate = 0;
+        int32_t finalwgm    = 0;
+
+        double aRatio   = float(MT0) / float(MT0 + MT1);
+        double bRatio   = float(MT1) / float(MT0 + MT1);
+
+        uint64_t aHitElements  = 0;
+        uint64_t aMissElements = 0;
+        uint64_t bHitElements  = 0;
+        uint64_t bMissElements = 0;
+
+        bool isL2BypassA = (NTA & 0x6) > 0;
+        bool isL2BypassB = (NTB & 0x6) > 0;
+
+        //std::cout<<"GSU="<<gsu<<", batch="<<batches<<", isL2BypassA = "<<isL2BypassA<<", isL2BypassB = "<<isL2BypassB<<std::endl;
+
+        uint32_t hitA    = 0;
+        uint32_t hitB    = 0;
+        uint32_t missA   = 0;
+        uint32_t missB   = 0;
+
+        for(uint32_t wg = 0; wg < totalWGNum; wg++)
+        {
+            //clean cache
+            if((wg % WGMXCCG) == 0)
+            {
+                //loop every XCDs
+                for(uint32_t xcd = 0; xcd < NumXCDs && wg > 0; xcd++)
+                {
+                    uint32_t MT0_A = 0;
+                    for(uint32_t g = 0; g < gsuMulBatch; g++)
+                    {
+                        for(uint32_t i = 0; i < wg0; i++)
+                        {
+                            if(arrA[g*wg0 + i] & (1<<xcd))
+                            {
+                                if(i == (wg0 - 1)) //Edge
+                                    MT0_A += (MT0_Edge * (K/gsu)) * bpeA;
+                                else
+                                    MT0_A += (MT0 * (K/gsu)) * bpeA;
+                            }
+                        }
+                    }
+
+                    uint32_t MT1_B = 0;
+                    for(uint32_t g = 0; g < gsuMulBatch; g++)
+                    {
+                        for(uint32_t i = 0; i < wg1; i++)
+                        {
+                            if(arrB[g*wg1 + i] & (1<<xcd))
+                            {
+                                if(i == (wg1 - 1)) //Edge
+                                    MT1_B += (MT1_Edge * (K/gsu)) * bpeB;
+                                else
+                                    MT1_B += (MT1 * (K/gsu)) * bpeB;
+                                //std::cout<<"i,g,MT1_B:"<<i<<","<<g<<","<<MT1_B<<std::endl;
+                            }
+                        }
+                    }
+                    //std::cout<<"XCD:"<<xcd<<", next round("<<wg<<"): L2Capacity="<<L2Capacity<<", A:"<<MT0_A<<", B:"<<MT1_B<<std::endl;
+                    if(MT0_A + MT1_B <= L2Capacity)
+                    {
+                        //keep in cache
+                        //std::cout<<"keep in cache"<<std::endl;
+                        for(uint32_t g = 0; g < gsuMulBatch; g++)
+                            for(uint32_t i = 0; i < wg0; i++)
+                                arrA_2[g*wg0 + i] |= arrA[g*wg0 + i] & (1<<xcd);
+                        for(uint32_t g = 0; g < gsuMulBatch; g++)
+                            for(uint32_t i = 0; i < wg1; i++)
+                                arrB_2[g*wg1 + i] |= arrB[g*wg1 + i] & (1<<xcd);
+                    }
+                    else
+                    {
+                        //clean cache
+                        //std::cout<<"clean cache"<<std::endl;
+                        arrA_2.assign(wg0*gsuMulBatch, 0);
+                        arrB_2.assign(wg1*gsuMulBatch, 0);
+                    }
+                }
+
+                arrA.assign(wg0*gsuMulBatch, 0);
+                arrB.assign(wg1*gsuMulBatch, 0);
+            }
+
+            // go xccgroup
+            //std::cout<<"go xccgroup";
+            uint32_t xccgIdx  = wg / WGMXCCG;
+            uint32_t realWGId = xccgIdx * WGMXCCG;
+
+            // get xccgroup wgNum
+            //std::cout<<"get xccgroup wgNum";
+            uint32_t xccgWgNum = min(WGMXCCG, totalWGNum - realWGId);
+            // how many wg per xcc in this xccgroup
+            uint32_t xccunit = xccgWgNum / WGMXCC;
+            uint32_t xccres  = xccgWgNum % WGMXCC;
+            // starting wgId
+            uint32_t resWGId = (wg - realWGId) % xccgWgNum;
+
+            // go xcc
+            //std::cout<<"go xcc";
+            uint32_t xccIdx = resWGId % WGMXCC;
+            // skip previous xcc
+            uint32_t skip = 0;
+            for(int i = 0; i < xccIdx; i++)
+            {
+                // skip i
+                skip += xccunit;
+                if (i < xccres)
+                {
+                    // this xcc has extra 1 wg
+                    skip += 1;
+                }
+            }
+            realWGId += skip;
+
+            // go inner xccid
+            // in XCCN, we get the idx of the wg in XCCN.
+            uint32_t innerXccId = resWGId / WGMXCC;
+            realWGId           += innerXccId;
+
+            int32_t sgprWGM            = wgm;
+            uint32_t sgprNumWorkGroups0 = wg0;
+            uint32_t sgprNumWorkGroups1 = wg1;
+            uint32_t wg2                = realWGId / (sgprNumWorkGroups0 * sgprNumWorkGroups1 * gsu); //batch
+            uint32_t idxWG01            = realWGId - (wg2 * sgprNumWorkGroups0 * sgprNumWorkGroups1 * gsu);
+            uint32_t sgprWorkGroup1     = idxWG01 / wg0;
+            uint32_t sgprWorkGroup0     = idxWG01 - (sgprWorkGroup1 * wg0);
+
+            //go GSUWGMRR
+            //std::cout<<"realWGId = "<<realWGId<<" , sgprWorkGroup0 = "<<sgprWorkGroup0<<" , sgprWorkGroup1 = "<<sgprWorkGroup1<<std::endl;
+            uint32_t gsuSumIdx = 0;
+            if(isGSUWGMRR)
+            {
+                gsuSumIdx      = sgprWorkGroup1 / sgprNumWorkGroups1;
+                sgprWorkGroup1 = sgprWorkGroup1 % sgprNumWorkGroups1;
+            }
+            else
+            {
+                gsuSumIdx      = sgprWorkGroup1 % gsu;
+                sgprWorkGroup1 = sgprWorkGroup1 / gsu;
+            }
+            //std::cout<<"gsuSumIdx = "<<gsuSumIdx<<" , sgprWorkGroup0 = "<<sgprWorkGroup0<<" , sgprWorkGroup1 = "<<sgprWorkGroup1<<std::endl;
+            uint32_t finalwg1, finalwg0;
+            if(wgm > 0)
+            {
+                uint32_t v6 = sgprWorkGroup1 / sgprWGM;
+                uint32_t s84 = v6 * sgprWGM;
+                s84 = sgprWorkGroup1 - s84;
+                s84 *= sgprNumWorkGroups0;
+                s84 += sgprWorkGroup0;
+                uint32_t s81 = v6;
+
+                v6 = sgprNumWorkGroups1 / sgprWGM;
+                uint32_t s82 = v6;
+                uint32_t s83 = sgprWGM * s82;
+                s83 = sgprNumWorkGroups1 - s83;
+                if(s83 == 0)
+                    s83 = sgprWGM;
+                if(s81 >= s82)
+                    s82 = s83;
+                else
+                    s82 = sgprWGM;
+
+                v6 = s84 / s82;
+                uint32_t v7 = v6 * s82;
+                v7 = s84 - v7;
+                sgprWorkGroup0 = v6;
+                sgprWorkGroup1 = v7;
+                sgprWorkGroup1 = sgprWorkGroup0 * s82;
+                sgprWorkGroup1 = s84 - sgprWorkGroup1;
+                s81 *= sgprWGM;
+                sgprWorkGroup1 += s81;
+
+                finalwg1    = sgprWorkGroup1;
+                finalwg0    = sgprWorkGroup0;
+            }
+            else
+            {
+                sgprWGM = 0 - sgprWGM;
+
+                uint32_t v12 = sgprWorkGroup0 / sgprWGM;
+                uint32_t s85 = v12;
+
+                uint32_t s88 = s85 * sgprWGM;
+                s88 = sgprWorkGroup0 - s88;
+                s88 *= sgprNumWorkGroups1;
+                s88 += sgprWorkGroup1;
+
+                v12 = sgprNumWorkGroups0 / sgprWGM;
+                uint32_t s86 = v12;
+                uint32_t s87 = sgprWGM * s86;
+                s87 = sgprNumWorkGroups0 - s87;
+                if(s87 == 0)
+                    s87 = sgprWGM;
+                if(s85 >= s86)
+                    s86 = s87;
+                else
+                    s86 = sgprWGM;
+
+                v12 = s88 / s86;
+                uint32_t v13 = v12 * s86;
+                v13 = s88 - v13;
+
+                sgprWorkGroup1 = v12;
+                sgprWorkGroup0 = v13;
+                sgprWorkGroup0 = sgprWorkGroup1 * s86;
+                sgprWorkGroup0 = s88 - sgprWorkGroup0;
+                s85 *= sgprWGM;
+                sgprWorkGroup0 += s85;
+
+                finalwg0    = sgprWorkGroup0;
+                finalwg1    = sgprWorkGroup1;
+            }
+            //std::cout<<"xccIdx = "<<xccIdx<<" ,batch, gsuSumIdx, finalwg0, finalwg1 = "<<wg2<<","<<gsuSumIdx<<","<<finalwg0<<","<<finalwg1<<std::endl;
+            uint32_t idxA = (wg2*gsu+gsuSumIdx)*wg0 + finalwg0;
+            if(isL2BypassA)
+            {
+                missA++;
+                if(finalwg0 == wg0 - 1) //Edge
+                    aMissElements += (MT0_Edge * depthU);
+                else
+                    aMissElements += (MT0 * depthU);
+            }
+            else if((arrA[idxA] & (1<<xccIdx)) || (arrA_2[idxA] & (1<<xccIdx)))
+            {
+                hitA++;
+                if(finalwg0 == (wg0 - 1)) //Edge
+                    aHitElements += (MT0_Edge * depthU);
+                else
+                    aHitElements += (MT0 * depthU);
+                //std::cout<<"hitA "<<aHitElements<<std::endl;
+                arrA[idxA] |= (1<<xccIdx);
+            }
+            else
+            {
+                missA++;
+                if(finalwg0 == wg0 - 1) //Edge
+                    aMissElements += (MT0_Edge * depthU);
+                else
+                    aMissElements += (MT0 * depthU);
+                //std::cout<<"missA "<<aMissElements<<std::endl;
+                arrA[idxA] |= (1<<xccIdx);
+            }
+            uint32_t idxB = (wg2*gsu+gsuSumIdx)*wg1+finalwg1;
+            if(isL2BypassB)
+            {
+                missB++;
+                if(finalwg1 == (wg1 - 1)) //Edge
+                    bMissElements += (MT1_Edge * depthU);
+                else
+                    bMissElements += (MT1 * depthU);
+            }
+            else if((arrB[idxB] & (1<<xccIdx)) || (arrB_2[idxB] & (1<<xccIdx)))
+            {
+                hitB++;
+                if(finalwg1 == (wg1 - 1)) //Edge
+                    bHitElements += (MT1_Edge * depthU);
+                else
+                    bHitElements += (MT1 * depthU);
+                //std::cout<<"hitB"<<std::endl;
+                arrB[idxB] |= (1<<xccIdx);
+            }
+            else
+            {
+                missB++;
+                if(finalwg1 == (wg1 - 1)) //Edge
+                    bMissElements += (MT1_Edge * depthU);
+                else
+                    bMissElements += (MT1 * depthU);
+                //std::cout<<"missB"<<std::endl;
+                arrB[idxB] |= (1<<xccIdx);
+            }
+        }
+
+        double hitRateA_old = float(hitA) / float(hitA + missA);
+        double hitRateB_old = float(hitB) / float(hitB + missB);
+        double totalHitRate_old = double(aRatio * hitRateA_old) + double(bRatio * hitRateB_old);
+
+        if(aHitElements > 0)
+            hitRateA = double(aHitElements) / double(aHitElements + aMissElements);
+        if(bHitElements > 0)
+            hitRateB = double(bHitElements) / double(bHitElements + bMissElements);
+        if(aHitElements + bHitElements > 0)
+            totalHitRate = double(aHitElements + bHitElements) / double(aHitElements + aMissElements + bHitElements + bMissElements);
+
+        //std::cout<<"Old HR is "<<hitRateA_old<<","<<hitRateB_old<<","<<totalHitRate_old<<std::endl;
+        //std::cout<<"New HR is "<<hitRateA<<","<<hitRateB<<","<<totalHitRate<<std::endl;
+        //std::cout<<"A Hit is "<<aHitElements<<", miss is"<<aMissElements<<std::endl;
+        //std::cout<<"B Hit is "<<bHitElements<<", miss is"<<bMissElements<<std::endl;
+        hitRate.totalHitRate = totalHitRate;
+        hitRate.tile0HitRate = hitRateA;
+        hitRate.tile1HitRate = hitRateB;
+
+        return hitRate;
     }
 
     ContractionSolution::TAMetricProblemScore ContractionSolution::computeProblemScore(
@@ -3451,6 +4512,7 @@ namespace TensileLite
                       << " waveGranularity=" << pp.granularities.waveGranularity
 
                       << " speedGFlops=" << pp.speedGFlops
+                      << " microSeconds=" << pp.microSeconds
 
                       << " staticModel=[ " << pp.staticModel << " ]";
     }

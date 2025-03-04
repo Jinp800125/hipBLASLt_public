@@ -29,6 +29,8 @@
 #include "ResultReporter.hpp"
 #include <Tensile/Debug.hpp>
 
+#include <omp.h>
+
 namespace TensileLite
 {
     namespace Client
@@ -38,23 +40,25 @@ namespace TensileLite
             std::shared_ptr<Hardware>                                      hardware,
             po::variables_map const&                                       args)
         {
-            bool bestSolution     = args["best-solution"].as<bool>();
-            int  gridbasedTopSols = Debug::Instance().getGridbasedTopSols();
-            bool printWinnerOnly  = args["PrintWinnersOnly"].as<bool>();
+            bool   bestSolution        = args["best-solution"].as<bool>();
+            int    gridbasedTopSols    = Debug::Instance().getGridbasedTopSols();
+            bool   printWinnerOnly     = args["PrintWinnersOnly"].as<bool>();
+            double predictionThreshold = args["prediction-threshold"].as<double>();
 
             if(bestSolution)
             {
                 return std::make_shared<TopSolutionIterator>(
-                    library, hardware, gridbasedTopSols, printWinnerOnly);
+                    library, hardware, predictionThreshold, gridbasedTopSols, printWinnerOnly);
             }
             else
             {
-                int firstSolutionIdx = args["solution-start-idx"].as<int>();
-                int numSolutions     = args["num-solutions"].as<int>();
+                int firstSolutionIdx       = args["solution-start-idx"].as<int>();
+                int numSolutions           = args["num-solutions"].as<int>();
 
                 return std::make_shared<AllSolutionsIterator>(
                     library,
                     hardware,
+                    predictionThreshold,
                     firstSolutionIdx,
                     numSolutions,
                     printWinnerOnly,
@@ -160,7 +164,6 @@ namespace TensileLite
             po::variables_map const&                                       args)
         {
             RunCriteria criteria;
-
             double granThresh = args["granularity-threshold"].as<double>();
             if(granThresh > 0.0)
             {
@@ -177,12 +180,14 @@ namespace TensileLite
         AllSolutionsIterator::AllSolutionsIterator(
             std::shared_ptr<MasterSolutionLibrary<ContractionProblemGemm>> library,
             std::shared_ptr<Hardware>                                      hardware,
+            double                                                         predictionThreshold,
             int                                                            firstSolutionIdx,
             int                                                            numSolutions,
             bool                                                           printWinnerOnly,
             RunCriteria                                                    runCriteria)
             : SolutionIterator(library, hardware, printWinnerOnly)
             , m_runCriteria(runCriteria)
+            , m_predictionThreshold(predictionThreshold)
         {
             m_firstSolutionIdx = firstSolutionIdx;
 
@@ -206,7 +211,59 @@ namespace TensileLite
         {
             SolutionIterator::preProblem(problem);
 
-            m_currentSolutionIdx = m_firstSolutionIdx;
+            std::vector<std::pair<int,double>> performance;
+            for (int i = m_firstSolutionIdx; i <= m_lastSolutionIdx; i++)
+            {
+                auto iter = m_library->solutions.find(i);
+                if(iter != m_library->solutions.end())
+                {
+                    auto solution = iter->second;
+                    if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
+                    {
+                        if(!checkSolution(*solution, *gemmProblem))
+                            continue;
+                        auto projPerf = solution->predictedPerformance(*gemmProblem, *m_hardware);
+                        //std::cout<<"performance is "<<projPerf.microSeconds<<std::endl;
+                        performance.push_back(std::pair(i,projPerf.microSeconds));
+                        m_hitrate[i] = projPerf.hitRate;
+                    }
+                }
+            }
+
+            auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
+            std::sort(performance.begin(),performance.end(),comp);
+            // TODO: This is the simple threshold method.
+            // May use the best perf * 1.x as threshold in the future.
+            size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
+            auto threshhold = performance[index].second;
+
+            // push content
+            if(!m_qSolutionIdx.empty())
+            {
+                throw std::runtime_error(
+                    "[AllSolutionsIterator::preProblem] Solution queue is not empty");
+            }
+
+            for (int i=0; i<performance.size(); i++)
+            {
+                if(performance[i].second <= threshhold)
+                {
+                    // std::cout<<"check performance "<<performance[i].second<<std::endl;
+                    m_qSolutionIdx.push(performance[i]);
+                }
+                else
+                {
+                    // std::cout<<"too large performance "<<performance[i].second<<std::endl;
+                    // break;
+                }
+            }
+            m_currentSolutionIdx = m_qSolutionIdx.front().first;
+            m_currentPrediction  = m_qSolutionIdx.front().second;
+            m_currentIdx = 0;
+
+            std::cout<<"predict performance is "<<performance[0].second<<std::endl;
+            std::cout<<"Threshold performance is "<<threshhold<<std::endl;
+            std::cout<<"Solution number is "<<m_qSolutionIdx.size()<<std::endl;
         }
 
         void AllSolutionsIterator::postProblem() {}
@@ -216,17 +273,23 @@ namespace TensileLite
             m_reporter->report(ResultKey::SolutionLibraryIndex, solution.libraryLogicIndex);
             m_reporter->report(ResultKey::SolutionIndex, m_currentSolutionIdx);
             m_reporter->report(ResultKey::SolutionProgress,
-                               concatenate(m_currentSolutionIdx, "/", m_lastSolutionIdx));
+                concatenate("hitrate,",m_hitrate[m_currentSolutionIdx],",",m_currentSolutionIdx,"->",m_currentPrediction," us, ",m_currentIdx,"/",m_lastSolutionIdx));
         }
 
         void AllSolutionsIterator::postSolution()
         {
-            m_currentSolutionIdx++;
+            m_currentIdx++;
+            m_qSolutionIdx.pop();
+            if(!m_qSolutionIdx.empty())
+            {
+                m_currentSolutionIdx = m_qSolutionIdx.front().first;
+                m_currentPrediction  = m_qSolutionIdx.front().second;
+            }
         }
 
         bool AllSolutionsIterator::moreSolutionsInProblem() const
         {
-            return m_currentSolutionIdx <= m_lastSolutionIdx;
+            return !m_qSolutionIdx.empty();
         }
 
         std::shared_ptr<ContractionSolution> AllSolutionsIterator::getSolution()
@@ -325,10 +388,12 @@ namespace TensileLite
         TopSolutionIterator::TopSolutionIterator(
             std::shared_ptr<MasterSolutionLibrary<ContractionProblemGemm>> library,
             std::shared_ptr<Hardware>                                      hardware,
+            double                                                         predictionThreshold,
             int                                                            numSolutions,
             bool                                                           printWinnerOnly)
             : SolutionIterator(library, hardware, printWinnerOnly)
             , m_numSolutions(numSolutions)
+            , m_predictionThreshold(predictionThreshold)
         {
         }
 
@@ -342,8 +407,22 @@ namespace TensileLite
             }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {
-                m_solutions
-                    = m_library->findTopSolutions(*gemmProblem, *m_hardware, m_numSolutions);
+                if(m_numSolutions == -1)
+                {
+                    if(m_solutions.size()==0)
+                    {
+                        m_solutions.clear();
+                        std::set<std::shared_ptr<ContractionSolution>> sols;
+                        sols = m_library->findAllSolutions(*gemmProblem, *m_hardware);
+                        for(auto it=sols.begin(); it != sols.end(); it++)
+                            m_solutions.push_back(*it);
+                    }
+                }
+                else
+                {
+                    m_solutions
+                        = m_library->findTopSolutions(*gemmProblem, *m_hardware, m_numSolutions);
+                }
             }
             else
             {
@@ -354,7 +433,40 @@ namespace TensileLite
             {
                 m_solutions.push_back(m_library->solutions.find(0)->second);
             }
-            m_currentSolutionIdx = 0;
+            std::vector<std::pair<int,double>> performance;
+            for (int i = 0; i < m_solutions.size(); i++)
+            {
+                if(auto gemmProblem = dynamic_cast<ContractionProblemGemm*>(problem))
+                {
+                    if(!checkSolution(*m_solutions[i], *gemmProblem))
+                        continue;
+                    auto projPerf = m_solutions[i]->predictedPerformance(*gemmProblem, *m_hardware);
+                    performance.push_back(std::pair(i,projPerf.microSeconds));
+                    m_hitrate[i] = projPerf.hitRate;
+                }
+            }
+
+            auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
+            std::sort(performance.begin(),performance.end(),comp);
+            size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
+            auto threshhold = performance[index].second;
+            // push content
+            if(!m_qSolutionIdx.empty())
+            {
+                throw std::runtime_error(
+                    "[TopSolutionIterator::preProblem] Solution queue is not empty");
+            }
+
+            for (int i=0; i<performance.size(); i++)
+            {
+                if(performance[i].second <= threshhold)
+                {
+                    m_qSolutionIdx.push(performance[i]);
+                    break;
+                }
+            }
+            m_currentSolutionIdx = m_qSolutionIdx.front().first;
+            m_currentPrediction  = m_qSolutionIdx.front().second;
         }
 
         void TopSolutionIterator::postProblem() {}
@@ -364,17 +476,24 @@ namespace TensileLite
             m_reporter->report(ResultKey::SolutionLibraryIndex, solution.libraryLogicIndex);
             m_reporter->report(ResultKey::SolutionIndex, m_currentSolutionIdx);
             m_reporter->report(ResultKey::SolutionProgress,
-                               concatenate(m_currentSolutionIdx, "/", m_solutions.size()));
+                               concatenate(m_currentSolutionIdx,"->",m_currentPrediction," us, ",m_currentSolutionIdx,"/",m_solutions.size()));
         }
 
         void TopSolutionIterator::postSolution()
         {
-            m_currentSolutionIdx++;
+            //m_currentSolutionIdx++;
+            m_qSolutionIdx.pop();
+            if(!m_qSolutionIdx.empty())
+            {
+                m_currentSolutionIdx = m_qSolutionIdx.front().first;
+                m_currentPrediction  = m_qSolutionIdx.front().second;
+            }
         }
 
         bool TopSolutionIterator::moreSolutionsInProblem() const
         {
-            return m_currentSolutionIdx < m_solutions.size();
+            //return m_currentSolutionIdx < m_solutions.size();
+            return !m_qSolutionIdx.empty();
         }
 
         std::shared_ptr<ContractionSolution> TopSolutionIterator::getSolution()

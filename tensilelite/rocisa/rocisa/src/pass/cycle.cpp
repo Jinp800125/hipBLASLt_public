@@ -22,6 +22,7 @@
  * ************************************************************************ */
 #include "instruction/branch.hpp"
 #include "instruction/instruction.hpp"
+#include "instruction/mem.hpp"
 #include "instruction/mfma.hpp"
 #include "pass.hpp"
 
@@ -29,6 +30,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <queue>
 
 namespace rocisa
 {
@@ -48,6 +50,35 @@ namespace rocisa
         }
     }
 
+    int _checkLocalReadFIFOFull(int currentCycle, std::queue<int>& fifo, std::shared_ptr<DSLoadInstruction> lrItem, int numWaves) {
+        int finalCycle = currentCycle;
+        int lrStallLatencyBuffer;
+
+        if (auto lr128 = std::dynamic_pointer_cast<DSLoadB128>(lrItem)) {
+            lrStallLatencyBuffer = 10;
+        } else if (auto lr64 = std::dynamic_pointer_cast<DSLoadB64>(lrItem)) {
+            lrStallLatencyBuffer = 5;
+        } else {
+            lrStallLatencyBuffer = 2;
+        }
+
+        if (fifo.size() < (16 / numWaves)) {
+            fifo.push(currentCycle);
+        } else {
+            int oldCycle = fifo.front();
+            if ((currentCycle - oldCycle) >= lrStallLatencyBuffer) {
+                fifo.pop();
+                fifo.push(currentCycle);
+            } else {
+                finalCycle = oldCycle + lrStallLatencyBuffer;
+                fifo.pop();
+                fifo.push(finalCycle);
+            }
+        }
+
+        return finalCycle;
+    }
+
     // Helper function to count cycles
     int _countCycles(std::shared_ptr<Module> item, int numWaves)
     {
@@ -56,6 +87,13 @@ namespace rocisa
 
         int cycles = 0;
         int hwMFMA = -99;
+        int jumpOverhead = 6;
+        std::queue<int> hwLRFIFO;
+        // Latency Table:
+        // 40 quad-cycle for b128
+        // 20 quad-cycle for b64
+        // 10 quad-cycle for b32
+        bool isEndOfLoop = false;
 
         for(auto& item : moduleInst)
         {
@@ -76,12 +114,22 @@ namespace rocisa
                 }
                 hwMFMA = cycles;
             }
+            else if(auto dsReadInst = std::dynamic_pointer_cast<DSLoadInstruction>(item))
+            {
+                //heck LR fifo
+                cycles = _checkLocalReadFIFOFull(cycles + dsReadInst->issueLatency(), hwLRFIFO, dsReadInst, numWaves);
+            }
+            else if(auto rwInst = std::dynamic_pointer_cast<ReadWriteInstruction>(item))
+            {
+                cycles += rwInst->issueLatency();
+            }
             else if(auto branchInst = std::dynamic_pointer_cast<BranchInstruction>(item))
             {
-                cycles += 1;
+                cycles = std::max(cycles + jumpOverhead, hwMFMA + 4);
                 // End of loop
                 if(branchInst->labelName == "label_LoopBeginL")
                 {
+                    isEndOfLoop = true;
                     break;
                 }
             }
@@ -89,12 +137,18 @@ namespace rocisa
             {
                 cycles += 1;
             }
-            // if(auto instruction = std::dynamic_pointer_cast<Instruction>(item))
-            // {
-            //     instruction->comment = "This is " + std::to_string(cycles) + "-cycle"; // for debug
-            // }
+            if(auto instruction = std::dynamic_pointer_cast<Instruction>(item))
+            {
+                instruction->comment = "This is " + std::to_string(cycles) + "-cycle"; // for debug
+            }
         }
-        return cycles;
+        if(!isEndOfLoop)
+        {
+            // Loop end without label_LoopBeginL label.
+            // Add jump overhead here
+            cycles += jumpOverhead + 1;
+        }
+        return cycles * 4; // 4 for gfx9
     }
 
     // Function to calculate math clocks in an unrolled loop
