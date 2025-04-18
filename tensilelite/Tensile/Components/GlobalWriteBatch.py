@@ -223,7 +223,7 @@ class GlobalWriteBatchWriter:
           for cntStr in waitLocalLoadCntStrList:
             tmp += " - %s"%cntStr
           comment = comment + (" " if comment else "") + "lgkmcnt(%d) = %d%s"%(lgkmcnt, lgkmcntTotalIssued, tmp)
-        if not self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
+        if 0:#not self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
           return SWaitCnt(lgkmcnt=lgkmcnt, vmcnt=vmcnt, vscnt=vscnt, comment="%s (interleaved)"%comment)
     else:
       commentList = []
@@ -908,12 +908,31 @@ class GlobalWriteBatchWriter:
 
         sumIdx = self.ss.elementSumIdx[elementIdx]
         if not self.kernel["StoreRemapVectorWidth"]:
-          tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'D', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store D %u" %sumIdx) #here
-          if self.kernel["GroupLoadStore"]:
-            storeCodeGSUSK.add(tmpStoreCode)
-          else:
-            module.addSpaceLine()
-            module.add(tmpStoreCode)
+          # tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'D', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store D %u" %sumIdx) #here
+
+          # apply in-bounds exec mask
+          # if self.edge:
+          #   module.add(self.getEdgeMovInstType()(EXEC(), sgpr(mask, self.laneSGPRC), "sgprs -> exec (before atomic)"))
+
+          for avi in range(0, self.gwvw // self.atomicW):
+            sumIdxV = self.ss.elementSumIdx[elementIdx] + avi
+            newSumIdxV = sumIdxV - self.parentWriter.states.c.startVgprValu
+            if self.parentWriter.do["GlobalWrite"]:
+              if self.kernel["BufferStore"]:
+                module.add(BufferAtomicAddF32(vgpr("ValuC+%u"%newSumIdxV), \
+                            vgpr(addrCalc.addrDVgpr,1), \
+                            sgpr("SrdTD", 4), \
+                            0,
+                            MUBUFModifiers(offen=True, offset12=addrCalc.globalOffset),
+                            "attempt write avi=%u" % (avi)))
+              else:
+                pass # TODO:
+
+          # if self.kernel["GroupLoadStore"]:
+          #   storeCodeGSUSK.add(tmpStoreCode)
+          # else:
+          #   module.addSpaceLine()
+          #   module.add(tmpStoreCode)
         else:
           rpe = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr
           module.add(self.parentWriter.storeRemapAddLocalWrite(self.kernel, self.ss, addrCalc, sumIdx*rpe))
@@ -921,14 +940,14 @@ class GlobalWriteBatchWriter:
           # Now read back and write out to global memory
       module.add(storeCodeGSUSK)
 
-    if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel" and self.kernel["StoreRemapVectorWidth"]:
+    if 0:#self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel" and self.kernel["StoreRemapVectorWidth"]:
       if self.parentWriter.StoreRemapLastBatch == 1:
         module.addComment1("Handle local read and global write")
         storeModule, numNewStores = self.parentWriter.storeRemapAddStore(self.kernel, self.tmpVgpr, self.tmpS01, self.edge, self.parentWriter.StoreRemapLastBatch)
         module.add(storeModule)
         self.storesIssued += numNewStores
 
-    if (self.kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel'):
+    if 0:#(self.kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel'):
       if self.parentWriter.states.serializedStore:
         module.add(SNop(0, "1 wait state required when next inst writes vgprs held by previous dwordx4 store inst"))
 
@@ -943,7 +962,7 @@ class GlobalWriteBatchWriter:
       module.addselfAsm("//sourece store done, GSU:"+str(self.kernel["GlobalSplitU"])+"\n") #GSUSYNC
       module.addSpaceLine()
 
-      module.add(self.GSUSynccodegen(SynchronizerEndlabel, sumIdxGSUSYNC, addrCalc.globalOffset, addrCalc.addrDVgpr))
+      # module.add(self.GSUSynccodegen(SynchronizerEndlabel, sumIdxGSUSYNC, addrCalc.globalOffset, addrCalc.addrDVgpr))
 
     # rC *= alpha
     if not self.kernel["InterleaveAlpha"] and self.applyAlpha and not self.parentWriter.alphaBeforeLoadC:
@@ -1453,9 +1472,9 @@ class GlobalWriteBatchWriter:
 
       if not self.kernel["StoreRemapVectorWidth"]:
         if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
-          tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'TD', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store TD not StoreRemapVectorWidth")
+          tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'TD', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store TD now not StoreRemapVectorWidth")
         else:
-          tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'D', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store D")
+          tmpStoreCode = self.parentWriter.addStore(self.kernel, self.ss, 'D', addrCalc, sumIdx, self.tmpS01, self.edge, comment="store D now")
         if self.kernel["GroupLoadStore"]:
           storeCode.add(tmpStoreCode)
         else:
@@ -1468,7 +1487,7 @@ class GlobalWriteBatchWriter:
           self.storesIssued += 1
 
       else:
-        if not self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
+        if 0:#not self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
           rpe = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr
           module.add(self.parentWriter.storeRemapAddLocalWrite(self.kernel, self.ss, addrCalc, sumIdx*rpe))
           # Column Block Shape has been written to LDS
@@ -1489,7 +1508,7 @@ class GlobalWriteBatchWriter:
 
     module.add(storeCode)
 
-    if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
+    if 0:#self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":#GSUGSU
       SynchronizerEndlabelString = "Sync_EDN%s%s" % ("_Beta" if self.beta else "", "_Edge" if self.edge else "" )
       SynchronizerEndlabelComment = "Sync_EDN"
       SynchronizerEndlabel = Label(self.parentWriter.labels.getName(SynchronizerEndlabelString), SynchronizerEndlabelComment)

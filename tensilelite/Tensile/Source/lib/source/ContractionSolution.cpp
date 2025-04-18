@@ -2578,13 +2578,13 @@ namespace TensileLite
         else
             rv.push_back(generateSingleCall<false>(problem, inputs, hardware));
 
-        if((sizeMapping.globalAccumulation != 3) && gsu > 1 && sizeMapping.globalAccumulation)
-        {
-            if(debug)
-                rv.push_back(generateOutputConversionCall<true>(problem, inputs));
-            else
-                rv.push_back(generateOutputConversionCall<false>(problem, inputs));
-        }
+        // if((sizeMapping.globalAccumulation != 3) && gsu > 1 && sizeMapping.globalAccumulation)
+        // {
+        //     if(debug)
+        //         rv.push_back(generateOutputConversionCall<true>(problem, inputs));
+        //     else
+        //         rv.push_back(generateOutputConversionCall<false>(problem, inputs));
+        // }
 
         if((!sizeMapping.activationFused) && (gsu > 1)
            && (problemType.activationType != ActivationType::None))
