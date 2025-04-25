@@ -1150,6 +1150,8 @@ kd_tree_batch_1_again:
                     if(T_Debug)
                     {
                         std::cout << "Searching next MN... ";
+                        std::cout << "bestmatches.size()... " << bestmatches.size();
+                        std::cout << "numSolutions... " << numSolutions;
                         std::cout << std::endl << std::endl;
                     }
 
@@ -1167,6 +1169,27 @@ kd_tree_batch_1_again:
 
                     origIter_M_lower = std::lower_bound(
                         start, table.end(), std::min(key[0], (table.end() - 1)->key[0]), compM);
+
+                    if(T_Debug)
+                    {
+                        std::cout << "MMM start: ";
+                        streamJoin(std::cout, start->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "MMM start+1: ";
+                        streamJoin(std::cout, (start+1)->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "MMM start+2: ";
+                        streamJoin(std::cout, (start+2)->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "MMM table.end(): ";
+                        streamJoin(std::cout, table.end()->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "MMM lower: " << (table.end() - 1)->key[0];
+                        }
 
                     if(T_Debug)
                     {
@@ -1194,17 +1217,128 @@ kd_tree_batch_1_again:
                                            std::min(key[1], (origIter_M_upper - 1)->key[1]),
                                            compN);
 
+                    int cnt = 0;
+                    auto left = origIter_M_lower, right = origIter_M_upper - 1;
+                    
+                    // int distanceeee = (right-left)/ 2;
+                    // while (distance > 0) {
+
+                    //     if current_value == target:
+                    //         closest_it = current_it
+                    //         if distance > 1:
+                    //             for _ in range(distance - 1):
+                    //                 closest_it = next(closest_it, None)
+                    //         break
+                    //     else if current_value < target:
+                    //         left_it = current_it
+                    //         closest_it = current_it
+                    //     else:
+                    //         right_it = current_it
+                            
+                    //     distance = distance/2
+                    // }
+                    auto first_candidate=left;
+                    auto first_nearest_idx=left;
+                    int target = std::min(key[1], (origIter_M_upper - 1)->key[1]);
+                    while(left < right){
+                    // while(left<right){
+                        int distanceeee = (right-left)/ 2;
+                        auto mid = left+distanceeee;
+                        
+                        if(mid->key[1] <= std::min(key[1], (origIter_M_upper - 1)->key[1])){
+                            first_candidate = mid;
+                            // std::cout << "result: ";
+                            // streamJoin(std::cout, (result)->key, ", ");
+                            // std::cout << std::endl << std::endl;
+                            left = mid+1;
+                        }
+                        else{ // arr[mid]>=49
+                            right = mid;
+                        }
+                    }
+                    if(T_Debug)
+                    {
+                        std::cout << "right: ";
+                        streamJoin(std::cout, (right)->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "left: ";
+                        streamJoin(std::cout, (left)->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "right-1: ";
+                        streamJoin(std::cout, (right-1)->key, ", ");
+                        std::cout << std::endl << std::endl;
+                        }
+
+                    // if (right > left and abs((right-1)->key[1] - target) <= abs(right->key[1] - target))
+                    //     first_candidate = right - 1;
+                    // else
+                    //     first_candidate = right;
+                    // first_nearest_idx = first_candidate;
+
+                    first_nearest_idx = first_candidate;
+                    if(T_Debug)
+                    {
+                        std::cout << "first_nearest_idx: ";
+                        streamJoin(std::cout, (first_nearest_idx)->key, ", ");
+                        std::cout << std::endl << std::endl;
+                        std::cout << "first_nearest_idx -1: ";
+                        streamJoin(std::cout, (first_nearest_idx-1)->key, ", ");
+                        std::cout << std::endl << std::endl;
+                        std::cout << "first_candidate: ";
+                        streamJoin(std::cout, (first_candidate)->key, ", ");
+                        std::cout << std::endl << std::endl;
+                        std::cout << "first_candidate -1: ";
+                        streamJoin(std::cout, (first_candidate-1)->key, ", ");
+                        std::cout << std::endl << std::endl;
+                        }
+
+                    while (first_candidate - 1 >= origIter_M_lower and (first_nearest_idx-1)->key[1] == first_nearest_idx->key[1] and abs((first_candidate-1)->key[1] - target) == abs(first_candidate->key[1] - target))
+                    {
+                        first_nearest_idx = first_candidate - 1;
+                        first_candidate -= 1;
+                        if(T_Debug)
+                        {
+                            std::cout << "result in: ";
+                            streamJoin(std::cout, (first_nearest_idx)->key, ", ");
+                            std::cout << std::endl << std::endl;
+                            }
+                    }
+
+
+                        // return first_nearest_idx, vector[first_nearest_idx]
+                        // distanceeee = (right-left)/ 2;
+                    if(T_Debug)
+                    {
+                        std::cout << "result: ";
+                        streamJoin(std::cout, (first_nearest_idx)->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "left: ";
+                        streamJoin(std::cout, (left)->key, ", ");
+                        std::cout << std::endl << std::endl;
+
+                        std::cout << "right: ";
+                        streamJoin(std::cout, (right)->key, ", ");
+                        std::cout << std::endl << std::endl;
+                        }
+
                     if(T_Debug)
                     {
                         std::cout << "N lower: ";
                         streamJoin(std::cout, origIter_N_lower->key, ", ");
                         std::cout << std::endl << std::endl;
+
+                        std::cout << "N lower -1 : ";
+                        streamJoin(std::cout, (origIter_N_lower-1)->key, ", ");
+                        std::cout << std::endl << std::endl;
                     }
 
                     origIter_N_upper = std::lower_bound(
-                        origIter_N_lower,
+                        first_nearest_idx, //origIter_N_lower
                         origIter_M_upper,
-                        std::min(origIter_N_lower->key[1] + 1, (origIter_M_upper - 1)->key[1] + 1),
+                        std::min(first_nearest_idx->key[1] + 1, (origIter_M_upper - 1)->key[1] + 1),
                         compN);
 
                     if(T_Debug)
@@ -1215,7 +1349,7 @@ kd_tree_batch_1_again:
                     }
 
                     origIter_B_lower
-                        = std::lower_bound(origIter_N_lower,
+                        = std::lower_bound(first_nearest_idx, //origIter_N_lower,
                                            origIter_N_upper,
                                            std::min(key[2], (origIter_N_upper - 1)->key[2]),
                                            compB);
