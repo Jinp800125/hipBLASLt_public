@@ -208,8 +208,30 @@ int run_bench_test(Arguments&         arg,
 int hipblaslt_bench_datafile(const std::string& filter, bool any_stride, hipDeviceProp_t& props)
 {
     int ret = 0;
+
     for(Arguments arg : HipBlasLt_TestData())
+    {
+        switch(arg.api_method)
+        {
+            case 0:
+                arg.use_ext            = false;
+                arg.use_ext_setproblem = false;
+                break;
+            case 1:
+                arg.use_ext            = true;
+                arg.use_ext_setproblem = false;
+                break;
+            case 2:
+                arg.use_ext            = true;
+                arg.use_ext_setproblem = true;
+                break;
+            default:
+                throw std::invalid_argument("Invalid value for api_method: " + std::to_string(arg.api_method));
+                break;
+        }
+
         ret |= run_bench_test(arg, filter, any_stride, props, true);
+    }
     test_cleanup::cleanup();
     return ret;
 }

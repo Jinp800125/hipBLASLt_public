@@ -29,6 +29,7 @@ import shutil
 import argparse
 from copy import deepcopy
 from enum import IntEnum
+import re
 
 verbosity = 1
 
@@ -408,6 +409,68 @@ def mergeLogic(oriData, incData, forceMerge, trimSize=True, addSolutionTags=Fals
 
     return [mergedData, numSizesAdded, numSolutionsAdded, numSolutionsRemoved]
 
+def ModifySpecificArg(originalDir, incrementalDir, outputPath, forceMerge, trimSize=True, addSolutionTags=False, noEff=False):
+    # oriData = loadData(originalDir)
+    # print(oriData[5][1])
+    # print(oriData[5][1]["GlobalSplitU"])
+    # print(oriData[5][1]["NonTemporalD"])
+    # if oriData[5][1]["GlobalSplitU"] == 1:
+    #     oriData[5][1]["NonTemporalD"] = 4
+    # print(oriData[5][1]["NonTemporalD"])
+    originalFiles = allFiles(originalDir)
+    incrementalFiles = allFiles(incrementalDir)
+    ensurePath(outputPath)
+
+    incrementalFilesTemp = []
+    originalFileNames = [os.path.split(o)[-1] for o in originalFiles]
+    for file in incrementalFiles:
+        if os.path.split(file)[-1] in originalFileNames:
+            incrementalFilesTemp.append(file)
+        else:
+            outputFile = os.path.join(outputPath, os.path.split(file)[-1])
+            shutil.copyfile(file, outputFile)
+            msg("Copied", file, "to", outputFile)
+
+    incrementalFiles = incrementalFilesTemp
+
+    for incFile in incrementalFiles:
+        basename = os.path.split(incFile)[-1]
+        origFile = os.path.join(originalDir, basename)
+        forceMerge = defaultForceMergePolicy(incFile) if forceMerge is None else forceMerge
+
+        msg("Base logic file:", origFile, "| Incremental:", incFile, "| Merge policy: %s"%("Forced" if forceMerge else "Winner"), "| Trim size:", trimSize,
+        "| Add solution tags:", addSolutionTags)
+        mergedData = loadData(origFile)
+        # incData = loadData(incFile)
+
+        # # Terminate when the destination folder doesn't match Incremental logic yaml
+        # # For example, merge Gridbased yaml to Equality folder or Equality yaml to GridBased folder
+        # compareDestFolderToYaml(originalDir, incFile, incData)
+
+        # # Terminate when ProblemType of originalFiles and incrementalFiles mismatch
+        # compareProblemType(oriData, incData)
+
+        # # So far "SolutionIndex" in logic yamls has zero impact on actual 1-1 size mapping (but the order of the Solution does)
+        # # since mergeLogic() takes that value very seriously so we reindex them here so it doesn't choke on duplicated SolutionIndex
+        # oriData = reindexSolutions(oriData)
+        # incData = reindexSolutions(incData)
+
+        # mergedData, *stats = mergeLogic(oriData, incData, forceMerge, trimSize, addSolutionTags, noEff)
+        # msg(stats[0], "size(s) and", stats[1], "kernel(s) added,", stats[2], "kernel(s) removed")
+
+        for i, _ in enumerate(mergedData[5]):
+            if mergedData[5][i]["GlobalSplitU"] == 1:
+                print("SolutionIndex: ", mergedData[5][i]["SolutionIndex"])
+                print("SolutionNameMin: ", mergedData[5][i]["SolutionNameMin"])
+                print("NonTemporalD: ", mergedData[5][i]["NonTemporalD"])
+                mergedData[5][i]["NonTemporalD"] = 4
+                print(mergedData[5][i]["NonTemporalD"])
+
+        with open(os.path.join(outputPath, basename), "w") as outFile:
+            yaml.safe_dump(mergedData,outFile,default_flow_style=None)
+        msg("File written to", os.path.join(outputPath, basename))
+        msg("------------------------------")
+
 def avoidRegressions(originalDir, incrementalDir, outputPath, forceMerge, trimSize=True, addSolutionTags=False, noEff=False):
     originalFiles = allFiles(originalDir)
     incrementalFiles = allFiles(incrementalDir)
@@ -499,6 +562,140 @@ def mergePartialLogics(partialLogicFilePaths, outputDir, forceMerge, trimSize=Tr
     msg("File written to", outputFilePath)
     msg("------------------------------")
 
+def direceCopyLogics(originalDir, incrementalDir, outputPath, forceMerge, trimSize=True, addSolutionTags=False, noEff=False):
+    originalFiles = allFiles(originalDir)
+    incrementalFiles = allFiles(incrementalDir)
+    ensurePath(outputPath)
+
+    incrementalFilesTemp = []
+    originalFileNames = [os.path.split(o)[-1] for o in originalFiles]
+    for file in incrementalFiles:
+        if os.path.split(file)[-1] in originalFileNames:
+            incrementalFilesTemp.append(file)
+        # else:
+        #     outputFile = os.path.join(outputPath, os.path.split(file)[-1])
+        #     shutil.copyfile(file, outputFile)
+        #     msg("Copied", file, "to", outputFile)
+
+    incrementalFiles = incrementalFilesTemp
+
+    basename = os.path.split(incrementalFiles[0])[-1]
+    origFile = os.path.join(originalDir, basename)
+    text=""
+    print("ori logic file : ", origFile)
+    with open(origFile, "r") as file:
+        text = file.read()
+    textInc=""
+    print("inc logic file : ", incrementalFiles[0])
+    with open(incrementalFiles[0], "r") as file:
+        textInc = file.read()
+
+    string = "SolutionIndex: "
+    oriTotalIndex = text.count(string)
+    incTotalIndex = textInc.count(string)
+    print("ori.count(sub) : ", oriTotalIndex)
+    print("inc.count(sub) : ", incTotalIndex)
+
+    textInc = textInc.replace("- - 1LDSBuffer:", "  - 1LDSBuffer:")
+
+    for reIncIndex in reversed(range(incTotalIndex)): #reindex
+        print("    - [" + str(oriTotalIndex+reIncIndex) + ", ")
+        print("    - [" + str(reIncIndex) + ", ")
+        textInc = textInc.replace("SolutionIndex: " + str(reIncIndex) + "\n", "SolutionIndex: " + str(oriTotalIndex+reIncIndex) + "\n")
+        textInc = textInc.replace("    - [" + str(reIncIndex) + ", ", "    - [" + str(oriTotalIndex+reIncIndex) + ", ")
+
+
+    textMerge = text[:text.index("- - 1LDSBuffer:")] + \
+                text[text.index("- - 1LDSBuffer:"):text.index("- [2, 3, 0, 1]")] + \
+                textInc[textInc.index("  - 1LDSBuffer:"):textInc.index("- [2, 3, 0, 1]")] + \
+                text[text.index("- [2, 3, 0, 1]"):-45] + " " + textInc[textInc.index("- [2, 3, 0, 1]")+16:]
+
+    with open(os.path.join(outputPath, basename), "w") as outFile:
+        outFile.write(textMerge)
+    msg("File written to", os.path.join(outputPath, basename))
+    msg("------------------------------")
+
+def removeDuplicateLogics(originalDir, incrementalDir, outputPath, forceMerge, trimSize=True, addSolutionTags=False, noEff=False):
+
+    basename = os.path.split(originalDir)[1]
+    origFile = originalDir # os.path.join(originalDir, basename)
+    
+    with open(origFile, "r") as file:
+        text = file.read()
+
+    textReduce = text # after reduce
+
+    pos = -1
+    if text.find("- - 1LDSBuffer:") != -1:
+        posPreStart = text.find("- - 1LDSBuffer:")
+        pos = posPreStart + len("- - 1LDSBuffer:")
+        pos = text.find("  - 1LDSBuffer:", pos) #結尾也是下個開頭
+
+    bypassitem = ["KernelNameMin:.*\n", "SolutionNameMin:.*\n", "SolutionIndex:.*\n"]
+    bypassstring = ["KernelNameMin:bypass\n", "SolutionNameMin:bypass\n", "SolutionIndex:bypass\n"]
+
+    sol_unique = []
+    sol_bypass = []
+    index_count = 0
+
+    while(pos != -1):
+        # pos = text.find("  - 1LDSBuffer:", pos) #結尾也是下個開頭
+
+        text_ori = text[posPreStart:pos]
+        text_bypass = text[posPreStart:pos]
+
+        for idx in range(len(bypassitem)):
+            text_bypass = re.sub(bypassitem[idx], bypassstring[idx], text_bypass) # 將這些不重要的都換成一樣
+        print(text_ori[text_ori.index("SolutionIndex"):text_ori.index("SolutionIndex")+len("SolutionIndex: ")+4]) # 將這些不重要的都換成一樣
+
+        if (text_bypass not in sol_bypass):
+
+            indInxe = text_ori.find("SolutionIndex")
+            indInend = text_ori[indInxe:].find("\n") #get ori SolutionIndex position
+            ori_SolutionIndex = text_ori[indInxe+15:indInxe+indInend]
+
+            sol_unique.append(text_ori.replace("SolutionIndex: " + ori_SolutionIndex + "\n", "SolutionIndex: "+ str(index_count) +"\n")) #REINDEX
+            sol_bypass.append(text_bypass)
+
+            indRexe = sol_unique[sol_bypass.index(text_bypass)].find("SolutionIndex")
+            indReend = sol_unique[sol_bypass.index(text_bypass)][indRexe:].find("\n") #get reindex SolutionIndex position
+            reindex_SolutionIndex = sol_unique[sol_bypass.index(text_bypass)][indRexe+15:indRexe+indReend] #str(index_count)
+
+            if (str(index_count) != reindex_SolutionIndex):
+                print("not match!!!!!!!!!!!!!!!!!!!")
+            textReduce = textReduce.replace("SolutionIndex: " + ori_SolutionIndex + "\n", "SolutionIndex: "+ reindex_SolutionIndex +"\n") # 將沒重複的solution index 換成reindex
+            textReduce = textReduce.replace("    - [" + ori_SolutionIndex + ",", "    - [" + reindex_SolutionIndex + ",") # 將index 換成換成reindex
+            print(ori_SolutionIndex, " REINDEX-> ", reindex_SolutionIndex, " ", index_count)
+
+            index_count = index_count + 1
+        else:
+
+            indInxe = sol_unique[sol_bypass.index(text_bypass)].find("SolutionIndex")
+            indInend = sol_unique[sol_bypass.index(text_bypass)][indInxe:].find("\n")
+            dup_SolutionIndex = sol_unique[sol_bypass.index(text_bypass)][indInxe+15:indInxe+indInend]
+
+            indDupxe = text_ori.find("SolutionIndex")
+            indDupend = text_ori[indDupxe:].find("\n")
+            ori_SolutionIndex = text_ori[indDupxe+15:indDupxe+indDupend]
+
+            print(ori_SolutionIndex, " Same As-> ", dup_SolutionIndex)
+            textReduce = textReduce.replace(text_ori, "") # 將重複的solution 刪掉
+            textReduce = textReduce.replace("    - [" + ori_SolutionIndex + ",", "    - [" + dup_SolutionIndex + ",") # 將重複的solution 換成一樣的
+
+        posPreStart = pos
+        pos = posPreStart + len("  - 1LDSBuffer:")
+        pos = text.find("  - 1LDSBuffer:", pos) #結尾也是下個開頭
+        if (pos == -1):
+            pos = text.find("- [2, 3, 0, 1]", pos) #結尾也是下個開頭
+
+    textMerge = textReduce
+
+    with open(os.path.join(outputPath, basename), "w") as outFile:
+        outFile.write(textMerge)
+    msg("File written to", os.path.join(outputPath, basename))
+    msg("------------------------------")
+
+
 if __name__ == "__main__":
     argParser = argparse.ArgumentParser()
     argParser.add_argument("original_dir", help="The library logic directory without tuned sizes")
@@ -525,4 +722,10 @@ if __name__ == "__main__":
     elif forceMerge in ["true", "1"]: forceMerge=True
     elif forceMerge in ["false", "0"]: forceMerge=False
 
-    avoidRegressions(originalDir, incrementalDir, outputPath, forceMerge, trimSize, add_solution_tags, no_eff)
+    print("Start")
+
+    # avoidRegressions(originalDir, incrementalDir, outputPath, forceMerge, trimSize, add_solution_tags, no_eff)
+    # mergePartialLogics(incrementalDir, outputPath, forceMerge)
+    # direceCopyLogics(originalDir, incrementalDir, outputPath, forceMerge, trimSize, add_solution_tags, no_eff)
+    removeDuplicateLogics(originalDir, incrementalDir, outputPath, forceMerge, trimSize, add_solution_tags, no_eff)
+    # ModifySpecificArg(originalDir, incrementalDir, outputPath, forceMerge, trimSize, add_solution_tags, no_eff)
