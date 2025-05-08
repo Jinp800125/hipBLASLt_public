@@ -653,21 +653,26 @@ def removeDuplicateLogics(originalDir, incrementalDir, outputPath, forceMerge, t
             indInxe = text_ori.find("SolutionIndex")
             indInend = text_ori[indInxe:].find("\n") #get ori SolutionIndex position
             ori_SolutionIndex = text_ori[indInxe+15:indInxe+indInend]
+            print("ori_SolutionIndex: ", ori_SolutionIndex, "count: ", textReduce.count("    - [" + ori_SolutionIndex + ","))
+            # print("ori_SolutionIndex: ", textReduce.find("    - [" + ori_SolutionIndex + ","))
 
-            sol_unique.append(text_ori.replace("SolutionIndex: " + ori_SolutionIndex + "\n", "SolutionIndex: "+ str(index_count) +"\n")) #REINDEX
-            sol_bypass.append(text_bypass)
+            # if textReduce.find("    - [" + ori_SolutionIndex + ",") != -1:
+            #     sol_unique.append(text_ori.replace("SolutionIndex: " + ori_SolutionIndex + "\n", "SolutionIndex: "+ str(index_count) +"\n")) #REINDEX
+            #     sol_bypass.append(text_bypass)
 
-            indRexe = sol_unique[sol_bypass.index(text_bypass)].find("SolutionIndex")
-            indReend = sol_unique[sol_bypass.index(text_bypass)][indRexe:].find("\n") #get reindex SolutionIndex position
-            reindex_SolutionIndex = sol_unique[sol_bypass.index(text_bypass)][indRexe+15:indRexe+indReend] #str(index_count)
+            #     indRexe = sol_unique[sol_bypass.index(text_bypass)].find("SolutionIndex")
+            #     indReend = sol_unique[sol_bypass.index(text_bypass)][indRexe:].find("\n") #get reindex SolutionIndex position
+            #     reindex_SolutionIndex = sol_unique[sol_bypass.index(text_bypass)][indRexe+15:indRexe+indReend] #str(index_count)
 
-            if (str(index_count) != reindex_SolutionIndex):
-                print("not match!!!!!!!!!!!!!!!!!!!")
-            textReduce = textReduce.replace("SolutionIndex: " + ori_SolutionIndex + "\n", "SolutionIndex: "+ reindex_SolutionIndex +"\n") # 將沒重複的solution index 換成reindex
-            textReduce = textReduce.replace("    - [" + ori_SolutionIndex + ",", "    - [" + reindex_SolutionIndex + ",") # 將index 換成換成reindex
-            print(ori_SolutionIndex, " REINDEX-> ", reindex_SolutionIndex, " ", index_count)
+            #     if (str(index_count) != reindex_SolutionIndex):
+            #         print("not match!!!!!!!!!!!!!!!!!!!")
+            #     textReduce = textReduce.replace("SolutionIndex: " + ori_SolutionIndex + "\n", "SolutionIndex: "+ reindex_SolutionIndex +"\n") # 將沒重複的solution index 換成reindex
+            #     textReduce = textReduce.replace("    - [" + ori_SolutionIndex + ",", "    - [" + reindex_SolutionIndex + ",") # 將index 換成換成reindex
+            #     print(ori_SolutionIndex, " REINDEX-> ", reindex_SolutionIndex, " ", index_count)
 
-            index_count = index_count + 1
+            #     index_count = index_count + 1
+            # else:
+            #     textReduce = textReduce.replace(text_ori, "") # 將重複的solution 刪掉
         else:
 
             indInxe = sol_unique[sol_bypass.index(text_bypass)].find("SolutionIndex")
@@ -684,9 +689,13 @@ def removeDuplicateLogics(originalDir, incrementalDir, outputPath, forceMerge, t
 
         posPreStart = pos
         pos = posPreStart + len("  - 1LDSBuffer:")
-        pos = text.find("  - 1LDSBuffer:", pos) #結尾也是下個開頭
-        if (pos == -1):
+        # pos = text.find("  - 1LDSBuffer:", pos) #結尾也是下個開頭
+        if (text.find("  - 1LDSBuffer:", pos) == -1):
             pos = text.find("- [2, 3, 0, 1]", pos) #結尾也是下個開頭
+            # print(text_ori)
+        else:
+            pos = text.find("  - 1LDSBuffer:", pos)
+        # print(pos)
 
     textMerge = textReduce
 

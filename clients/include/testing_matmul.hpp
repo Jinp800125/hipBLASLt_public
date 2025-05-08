@@ -4012,9 +4012,9 @@ void testing_matmul_with_bias(const Arguments& arg,
     CHECK_HIP_ERROR(hipStreamDestroy(stream));
     CHECK_HIP_ERROR(hipEventDestroy(event_gpu_time_start));
     CHECK_HIP_ERROR(hipEventDestroy(event_gpu_time_end));
-    // hipblaslt_cout << "gpu_time_used: " << gpu_time_used/arg.iters << std::endl;
-    gpu_time_used = (gpu_time_used)*8;//32;
-    // gpu_time_used = (gpu_time_used < 10240) ? 10240 : gpu_time_used;
-    gpu_time_used    = (gpu_time_used > 3000000) ? 3000000 : gpu_time_used;
-    std::this_thread::sleep_for(std::chrono::microseconds(int(gpu_time_used)));
+    // // hipblaslt_cout << "gpu_time_used: " << gpu_time_used/arg.iters << std::endl;
+    // gpu_time_used = (gpu_time_used)*8;//32;
+    // // gpu_time_used = (gpu_time_used < 10240) ? 10240 : gpu_time_used;
+    // gpu_time_used    = (gpu_time_used > 3000000) ? 3000000 : gpu_time_used;
+    // std::this_thread::sleep_for(std::chrono::microseconds(int(gpu_time_used)));
 }
