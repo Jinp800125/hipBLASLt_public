@@ -2652,14 +2652,7 @@ class Solution(collections.abc.Mapping):
     ldsNumBytes = max(ldsNumBytesAB, ldsNumBytesReduction, ldsNumBytesOccupancy)
 
     if state["NumElementsPerBatchStore"] == -1:
-      if ldsNumBytes > 32768 or \
-          state["ProblemType"]["ComputeDataType"].numBytes() * state["MacroTile0"] * state["MacroTile1"] > 32768*4:
-        state["NumElementsPerBatchStore"] = 0
-        state["StorePriorityOpt"] = 0
-        state["StoreSyncOpt"] = 0
-        state["GroupLoadStore"] = 0
-      else:
-        state["NumElementsPerBatchStore"] = 16 if not state["ProblemType"]["DataType"].numBytes() == 8 else 1
+      state["NumElementsPerBatchStore"] = (16 // state["MIWaveTile"][0]) * state["MIWaveTile"][0]
 
     # Mbsk prefetch optimization
     if state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel':
