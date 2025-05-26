@@ -234,7 +234,17 @@ namespace TensileLite
             std::sort(performance.begin(),performance.end(),comp);
             // TODO: This is the simple threshold method.
             // May use the best perf * 1.x as threshold in the future.
-            size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
+            uint32_t K = dynamic_cast<ContractionProblemGemm*>(problem)->boundSize(0);
+            double temp_predictionThreshold;
+            if(K <= 512)
+                temp_predictionThreshold = m_predictionThreshold;
+            else if(K <= 1024)
+                temp_predictionThreshold = m_predictionThreshold/2;
+            else if(K <= 4096)
+                temp_predictionThreshold = m_predictionThreshold/3;
+            else if(K <= 8192)
+                temp_predictionThreshold = m_predictionThreshold/4;
+            size_t index    = std::min(performance.size() - 1, size_t(performance.size() * temp_predictionThreshold));
             auto threshhold = performance[index].second;
 
             // push content

@@ -395,9 +395,9 @@ class Solution(collections.abc.Mapping):
       state["tailLoopOptB"] = False
 
     if (state["DirectToVgprA"] == -1):
-      state["DirectToVgprA"] = True if state['MIWaveGroup'][1] == 1 else False
+      state["DirectToVgprA"] = True if (state['MIWaveGroup'][1] == 1 and state["MacroTile0"] * state["MacroTile1"] >= 57344) else False
     if (state["DirectToVgprB"] == -1):
-      state["DirectToVgprB"] = True if state['MIWaveGroup'][0] == 1 else False
+      state["DirectToVgprB"] = True if (state['MIWaveGroup'][0] == 1 and state["MacroTile0"] * state["MacroTile1"] >= 57344) else False
 
     if (state["DirectToVgprA"]):
       state["tailLoopOptA"] = False

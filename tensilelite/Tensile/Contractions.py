@@ -36,7 +36,7 @@ from Tensile.SolutionStructs.Problem import getBiasDataTypeListDefault
 from Tensile.Toolchain.Component import Assembler
 from math import ceil
 
-MIN_K_FOR_GSU = 32
+MIN_K_FOR_GSU = 256
 @state_key_ordering
 class FreeIndex:
     StateKeys = ['isA', 'i', 'c', 'd']
