@@ -1895,11 +1895,14 @@ void testing_matmul_with_bias(const Arguments& arg,
             CHECK_HIP_ERROR(synchronize(hC[i], dC[i]));
         }
 
-        if(arg.swizzle_a && isSwizzleSupported(TiA))
+        if(arg.unit_check || arg.norm_check || arg.allclose_check)
         {
-            HipHostBuffer tmp(TiA, size_dA[i]);
-            swizzle_tensor_type(tmp, hA[i], TiA, arg, num_batches[i], M[i], K[i], lda[i], false);
-            CHECK_HIP_ERROR(synchronize(dA[i], tmp, block_count));
+            if(arg.swizzle_a && isSwizzleSupported(TiA))
+            {
+                HipHostBuffer tmp(TiA, size_dA[i]);
+                swizzle_tensor_type(tmp, hA[i], TiA, arg, num_batches[i], M[i], K[i], lda[i], false);
+                CHECK_HIP_ERROR(synchronize(dA[i], tmp, block_count));
+            }
         }
 
         if(arg.gradient && arg.use_e)
