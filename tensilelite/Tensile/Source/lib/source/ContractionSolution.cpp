@@ -3770,11 +3770,11 @@ namespace TensileLite
 
         uint32_t gsuMethod = sizeMapping.globalAccumulation;
         double gsu_overall = 0.0;
-        if(gsuMethod == 2 && GlobalSplitU > 1) //MB
+        if(GlobalSplitU > 1) //MB
         {
             double GSU_load = (GlobalSplitU * M * N * 4 * NumBatches) / hbmBandWidth / NumCUs;
-            double GSU_store = (M * N * bpeD * NumBatches) / hbmBandWidth / NumCUs;
-            gsu_overall = initialCost + GSU_load + GSU_store;
+            double GSU_store = (GlobalSplitU * M * N * bpeD * NumBatches) / hbmBandWidth / NumCUs;
+            gsu_overall = GSU_load + GSU_store;
         }
         else if(gsuMethod == 3 && GlobalSplitU > 1) //MBSK
         {
