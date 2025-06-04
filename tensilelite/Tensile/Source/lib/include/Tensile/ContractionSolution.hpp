@@ -434,7 +434,7 @@ namespace TensileLite
                         KA&                                 args,
                         uint32_t                            numWorkGroups,
                         Hardware const*                     hardware,
-                        const ContractionProblemParameters& param,
+                        Problem const&                      problem,
                         int32_t                             defaultWGM) const;
 
         template <typename KA>
