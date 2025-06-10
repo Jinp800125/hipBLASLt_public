@@ -3606,7 +3606,8 @@ namespace TensileLite
         double wavefrontSize = pAMDGPU->wavefrontSize;
         double MT0    = sizeMapping.macroTile.x;
         double MT1    = sizeMapping.macroTile.y;
-        double   GlobalSplitU    = sizeMapping.globalSplitU;
+        calculateAutoGSU(problem, &hardware);
+        double   GlobalSplitU    = autoGSU;
         double   math_clk        = sizeMapping.MathClocksUnrolledLoop; //MT0 * MT1 * 2 * depthU / flopsPerClk;
         int      WGM             = sizeMapping.workGroupMapping != 0 ? sizeMapping.workGroupMapping : 1;
         int      CUOccupancy     = sizeMapping.CUOccupancy;
