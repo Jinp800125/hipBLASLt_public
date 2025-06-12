@@ -32,8 +32,7 @@ from enum import IntEnum
 
 from Tensile.SolutionStructs.Naming import getSolutionNameMin
 from Tensile.SolutionStructs.Naming import getKernelNameMin
-from Tensile.SolutionStructs.Problem import _defaultProblemType
-from Tensile.Common.Utilities import assignParameterWithDefault
+from Tensile.SolutionStructs.Problem import ProblemType, problemTypeToEnum
 from Tensile.Common import ParallelMap2
 
 verbosity = 1
@@ -93,8 +92,9 @@ def sanitizeSolutions(solList):
 
 def reNameSolutions(solList):
     for sol in solList:
-        for key in _defaultProblemType:
-            assignParameterWithDefault(sol["ProblemType"], key, sol["ProblemType"], _defaultProblemType)
+        sol["ProblemType"] = ProblemType(sol["ProblemType"], False)
+        problemTypeToEnum(sol["ProblemType"])
+        sol["ProblemType"] = sol["ProblemType"].state
         sol["SolutionNameMin"] = getSolutionNameMin(sol,splitGSU=False)
         sol["KernelNameMin"] = getKernelNameMin(sol,splitGSU=False)
 
@@ -172,25 +172,11 @@ def compareDestFolderToYaml(originalDir, incFile, incData):
         sys.exit(f"[Error] Destination folder(={destFolder}) failed to match YAML attribute(={incAttribute}): \n{restuls}")
 
 def compareProblemType(oriData, incData):
-    # ProblemType defined in originalFiles and incrementalFiles
-    oriProblemType = oriData[4] # header
-    incProblemType = incData[4] # header
-    # Delete waived ProblemType items in originalFiles
-    waivedItems = [item for item in oriProblemType if item not in incProblemType]
-    if waivedItems:
-        # Header ProblemType
-        for item in waivedItems:
-            oriProblemType.pop(item)
-        # Kernel ProblemType
-        for i, _ in enumerate(oriData[5]):
-            # TODO: delete this for loop if kernel ProblemType is removed in the future
-            oriKernelProblemType = oriData[5][i]["ProblemType"]
-            for item in waivedItems:
-                try:
-                    oriKernelProblemType.pop(item)
-                except KeyError:
-                    oriSolutionIndex = oriData[5][i]["SolutionIndex"]
-                    print(f"[Warning] Popping '{item}' failed in oriData(idx={oriSolutionIndex})")
+    # ProblemType defined in originalFiles
+    oriData[4] = ProblemType(oriData[4],False)
+    problemTypeToEnum(oriData[4])
+    oriData[4] = oriData[4].state
+    oriProblemType = oriData[4]
 
     results = ""
     solIdx = 0
