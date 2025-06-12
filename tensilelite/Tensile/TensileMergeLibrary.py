@@ -28,7 +28,6 @@ import sys
 import shutil
 import argparse
 from copy import deepcopy
-from enum import IntEnum
 
 from Tensile.SolutionStructs.Naming import getSolutionNameMin
 from Tensile.SolutionStructs.Naming import getKernelNameMin
@@ -67,20 +66,19 @@ def fixSizeInconsistencies(sizes, fileType):
         verbose(numSize - origNumSizes, "duplicate size(s) removed from", fileType, "logic file")
     return newSizes, len(newSizes)
 
-def addKernel(solutionPool, solution):
-    for item in solutionPool:
-        if item["SolutionNameMin"] == solution["SolutionNameMin"]:
-            index = item["SolutionIndex"]
-            debug("...Reuse previously existed solution", end="")
-            break
+def addKernel(solutionPool, solDict, solution):
+    if solution["SolutionNameMin"] in solDict:
+        index = solDict[solution["SolutionNameMin"]]["SolutionIndex"]
+        debug("...Reuse previously existed solution", end="")
     else:
         index = len(solutionPool)
         _solution = deepcopy(solution) # if we don't we will see some subtle errors
         _solution["SolutionIndex"] = index
         solutionPool.append(_solution)
+        solDict[solution["SolutionNameMin"]] = _solution
         debug("...A new solution has been added", end="")
     debug("({}) {}".format(index, solutionPool[index]["SolutionNameMin"] if "SolutionNameMin" in solutionPool[index] else "(SolutionName N/A)"))
-    return solutionPool, index
+    return solutionPool, solDict, index
 
 # update dependant parameters if StaggerU == 0
 def sanitizeSolutions(solList):
@@ -236,6 +234,7 @@ def mergeLogic(oriData, incData, forceMerge, noEff=False):
     incData, numIncRemoved = removeUnusedSolutions(incData, "Inc logic file: ")
 
     solutionPool = deepcopy(oriData[5])
+    solDict = {sol["SolutionNameMin"]: sol for sol in oriData[5]}
     solutionMap = deepcopy(oriData[7])
 
     origDict = {tuple(origSize): [i, origEff] for i, [origSize, [origIndex, origEff]] in enumerate(oriData[7])}
@@ -251,14 +250,14 @@ def mergeLogic(oriData, incData, forceMerge, noEff=False):
                 elif forceMerge:
                     verbose("[!]", incSize, "already exists but does not improve in performance.", end="")
                 verbose("Efficiency:", origEff, "->", incEff, "(force_merge=True)" if forceMerge else "")
-                solutionPool, index = addKernel(solutionPool, incSolution)
+                solutionPool, solDict, index = addKernel(solutionPool, solDict, incSolution)
                 solutionMap[j][1] = [index, storeEff]
             else:
                 verbose("[X]", incSize, "already exists but does not improve in performance.", end="")
                 verbose("Efficiency:", origEff, "->", incEff)
         except KeyError:
                 verbose("[-]", incSize, "has been added to solution table, Efficiency: N/A ->", incEff)
-                solutionPool, index = addKernel(solutionPool, incSolution)
+                solutionPool, solDict, index = addKernel(solutionPool, solDict, incSolution)
                 solutionMap.append([incSize,[index, storeEff]])
 
     verbose(numOrigRemoved, "unused solutions removed from base logic file")
@@ -338,7 +337,6 @@ def avoidRegressions(originalDir, incrementalDir, outputPath, forceMerge, noEff=
         mergedData, *stats = mergeLogic(oriData, incData, forceMerge, noEff)
         msg(stats[0], "size(s) and", stats[1], "solution(s) added,", stats[2], "solution(s) removed.", \
             len(mergedData[7]), "sizes and", len(mergedData[5]), "solutions")
-
         with open(os.path.join(outputPath, basename), "w") as outFile:
             yaml.safe_dump(mergedData,outFile,default_flow_style=None)
         msg("File written to", os.path.join(outputPath, basename))
