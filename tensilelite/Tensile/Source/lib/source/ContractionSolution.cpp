@@ -780,7 +780,7 @@ namespace TensileLite
                                           args,
                                           0,
                                           hardware,
-                                          problem,
+                                          problem.getParams(),
                                           sizeMapping.workGroupMapping);
 
         if(!problemType.useScaleAB.empty()) //kernel input data
@@ -1047,11 +1047,9 @@ namespace TensileLite
                                          KA&                                 args,
                                          uint32_t                            numWorkGroups,
                                          Hardware const*                     hardware,
-                                         ContractionSolution::Problem const& problem,
+                                         const ContractionProblemParameters& param,
                                          int32_t                             defaultWGM) const
     {
-        ContractionProblemParameters param = problem.getParams();
-        uint32_t K = problem.boundSize(0);
         if constexpr(!Legacy)
         {
             gemmCount = gemmCount & 0x3FFFFFFF;
@@ -1117,21 +1115,13 @@ namespace TensileLite
         internalArg0
             = internalArg0 | ((uint32_t)gsuc << 15) | ((uint32_t)gsuwgmrr << 14) | (mask14 & gsu);
 
-        uint32_t staggerUTemp, staggerStrideShiftTemp;
-        if (int(K)%256!=0){
-            staggerUTemp = 0;
-            staggerStrideShiftTemp = 0;
-        } else {
-            staggerUTemp = 16;
-            staggerStrideShiftTemp = 0;
-        }
         // StaggerU
         if(internalArgsSupport.staggerU)
         {
             const uint32_t staggerMask1    = 0x1F00;
             uint32_t       staggerUMapping = (sizeMapping.staggerUMapping << 13);
-            uint32_t       staggerUShift   = staggerMask1 & ((staggerStrideShiftTemp) << 8);
-            uint32_t       staggerU        = mask8 & staggerUTemp;
+            uint32_t       staggerUShift   = staggerMask1 & ((sizeMapping.staggerStrideShift) << 8);
+            uint32_t       staggerU        = mask8 & sizeMapping.staggerU;
             staggerU                       = staggerU | staggerUShift;
             staggerU                       = staggerU | staggerUMapping;
             internalArg0                   = internalArg0 | (staggerU << 16);
@@ -1290,7 +1280,7 @@ namespace TensileLite
             }
 
             kernelArgs<T_Debug, false>(
-                1, 0, rv.args, getNumWorkGroups(rv), &hardware, problem, defaultWGM);
+                1, 0, rv.args, getNumWorkGroups(rv), &hardware, problem.getParams(), defaultWGM);
         }
         singleCallArgs<T_Debug, true>(
             problem, inputs, 0, &hardware, problemNumGroupTiles, rv.numWorkGroups, rv.args);
@@ -1458,7 +1448,7 @@ namespace TensileLite
                                            rv.args,
                                            getNumWorkGroups(rv),
                                            &hardware,
-                                           problems[0],
+                                           problems[0].getParams(),
                                            sizeMapping.workGroupMapping);
                 // For user input
                 if(argType == KERNELARGTYPE::USERARGS)
@@ -1484,7 +1474,7 @@ namespace TensileLite
                                           rv.args,
                                           0,
                                           &hardware,
-                                          problems[0],
+                                          problems[0].getParams(),
                                           sizeMapping.workGroupMapping);
             }
 
