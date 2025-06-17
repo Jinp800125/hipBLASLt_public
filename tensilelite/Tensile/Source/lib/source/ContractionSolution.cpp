@@ -1000,21 +1000,23 @@ namespace TensileLite
                     rs += N * elemBias;
                 }
             }
+
+            size_t tiles = problem.getNumTiles(sizeMapping, 1);
+            size_t tileSize = sizeMapping.macroTile.x * sizeMapping.macroTile.y * sizeMapping.workspaceSizePerElemC;
+            size_t bufSize = tiles * tileSize;
+
             autoGSU = min(autoGSU,
-                          (MAX_GSU_WORKSPACE_SIZE - rs) / sizeMapping.workspaceSizePerElemC
-                              / problem.d().totalLogicalElements());
+                          (MAX_GSU_WORKSPACE_SIZE - rs) / bufSize);
             if(problem.groupedGemm())
             {
                 assert(problem.workspaceSizeGroupedGemm() <= problem.workspaceSize());
                 autoGSU = min(autoGSU,
                               (problem.workspaceSizeGroupedGemm() - rs)
-                                  / sizeMapping.workspaceSizePerElemC
-                                  / problem.d().totalLogicalElements());
+                                  / bufSize);
             }
             else
                 autoGSU = min(autoGSU,
-                              (problem.workspaceSize() - rs) / sizeMapping.workspaceSizePerElemC
-                                  / problem.d().totalLogicalElements());
+                              (problem.workspaceSize() - rs) / bufSize);
         }
 
         // WorkgroupNumberCheck
