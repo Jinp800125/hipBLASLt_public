@@ -29,7 +29,6 @@
 #include "Tensile/Debug.hpp"
 #include "Tensile/Utils.hpp"
 #include "TypedId.hpp"
-#include <Tensile/hip/HipUtils.hpp>
 
 #include <cstddef>
 #include <omp.h>
@@ -694,7 +693,8 @@ namespace TensileLite
                && (problem.biasSrc() == ContractionProblemGemm::D))
             {
                 validationStrideGemm = 1;
-                HIP_CHECK_EXC(hipHostMalloc(&ws, problem.d().totalAllocatedElements() * sizeof(Accumulator), 0));
+                ws                   = (Accumulator*)malloc(problem.d().totalAllocatedElements()
+                                          * sizeof(Accumulator));
             }
             else
             {
@@ -1132,7 +1132,7 @@ namespace TensileLite
                         biasTensor, d, ws, inputs, elementsToValidate, 1);
                     if(!msg.empty())
                     {
-                        HIP_CHECK_EXC(hipHostFree(ws));
+                        free(ws);
                         std::runtime_error(msg.c_str());
                     }
                 }
@@ -1162,7 +1162,7 @@ namespace TensileLite
                                       + std::to_string(problem.biasSrc()) + ".";
                     throw std::runtime_error(msg.c_str());
                 }
-                HIP_CHECK_EXC(hipHostFree(ws));
+                free(ws);
             }
         }
 

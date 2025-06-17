@@ -1302,9 +1302,8 @@ namespace TensileLite
 
                     if(!pUnit.cpuInput.current)
                     {
-                        void* p  = nullptr;
-                        HIP_CHECK_EXC(hipHostMalloc(&p, size, 0));
-                        auto ptr = std::shared_ptr<void>(p, hipHostFree);
+                        auto ptr
+                            = std::shared_ptr<void>(std::malloc(size), [](auto p) { free(p); });
                         if(ptr == nullptr)
                         {
                             std::stringstream s;
@@ -1315,9 +1314,8 @@ namespace TensileLite
                     }
                     if(!pUnit.cpuInput.valid)
                     {
-                        void* p  = nullptr;
-                        HIP_CHECK_EXC(hipHostMalloc(&p, size, 0));
-                        auto ptr = std::shared_ptr<void>(p, hipHostFree);
+                        auto ptr
+                            = std::shared_ptr<void>(std::malloc(size), [](auto p) { free(p); });
                         if(ptr == nullptr)
                         {
                             std::stringstream s;
@@ -1328,9 +1326,8 @@ namespace TensileLite
                     }
                     if(!pUnit.cpuInput.bad && m_curBoundsCheck == BoundsCheckMode::NaN)
                     {
-                        void* p  = nullptr;
-                        HIP_CHECK_EXC(hipHostMalloc(&p, size, 0));
-                        auto ptr = std::shared_ptr<void>(p, hipHostFree);
+                        auto ptr
+                            = std::shared_ptr<void>(std::malloc(size), [](auto p) { free(p); });
                         if(ptr == nullptr)
                         {
                             std::stringstream s;
