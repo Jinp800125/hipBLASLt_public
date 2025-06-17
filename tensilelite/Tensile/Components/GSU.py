@@ -22,7 +22,7 @@
 
 from rocisa import countInstruction
 from rocisa.code import Module, Label, RegSet
-from rocisa.container import ContinuousRegister, SMEMModifiers, vgpr, sgpr, replaceHolder
+from rocisa.container import ContinuousRegister, SMEMModifiers, vgpr, sgpr, replaceHolder, VCC
 from rocisa.instruction import SAddCU32, SAddU32, SAndB32, SBranch, SCBranchSCC0, \
     SCBranchSCC1, SCMovB32, SCSelectB32, SCmpEQU32, SCmpLgU32, SCmpLtU32, SCmpGtI32, \
     SLShiftLeftB64, SLShiftRightB32, SMovB32, SMovB64, SMulI32, SSubU32, SCmpEQI32, \
@@ -1868,8 +1868,9 @@ class GSUOn(GSU):
         tmpS01 = writer.sgprPool.checkOut(1, preventOverflow=False) #
         tmpS02 = writer.sgprPool.checkOut(1, preventOverflow=False) #
         tmpS03 = writer.sgprPool.checkOut(1, preventOverflow=False) #
-        tmpS04 = writer.sgprPool.checkOutAligned(2,2, preventOverflow=False) #
-        tmpS05 = writer.sgprPool.checkOutAligned(2,2, preventOverflow=False) #
+        # tmpS04 = writer.sgprPool.checkOutAligned(2,2, preventOverflow=False) #
+        tmpS04 = writer.sgprs["SrdSync"]
+        # tmpS05 = writer.sgprPool.checkOutAligned(2,2, preventOverflow=False) #
         tmpS06 = writer.sgprPool.checkOutAligned(4,4, preventOverflow=False) #overflow?
 
         reductionOffset = kernel["MacroTile0"]*kernel["MacroTile1"]*writer.states.bpeCinternal
@@ -2044,8 +2045,11 @@ class GSUOn(GSU):
                     module.add(SAddU32(dst=sgpr(tmpS06+0), src0=sgpr(tmpS06+0), src1=sgpr(tmpS04+0), comment=""))
                     module.add(SAddCU32(dst=sgpr(tmpS06+1), src0=sgpr(tmpS06+1), src1=sgpr(tmpS04+1), comment=""))
 
-                    module.add(VCmpGEI32(dst=sgpr(tmpS05,2), src0=0, src1=sgpr("GSUSync"), comment=""))
-                    module.add(VCndMaskB32(dst=vgpr(GSUMvgpr), src1=vgpr(bufferOOB), src0=addr0, src2=sgpr(tmpS05,2), comment="protect if OOB"))
+                    # module.add(VCmpGEI32(dst=sgpr(tmpS05,2), src0=0, src1=sgpr("GSUSync"), comment=""))
+                    # module.add(VCndMaskB32(dst=vgpr(GSUMvgpr), src1=vgpr(bufferOOB), src0=addr0, src2=sgpr(tmpS05,2), comment="protect if OOB"))
+
+                    module.add(VCmpGEI32(dst=VCC(), src0=0, src1=sgpr("GSUSync"), comment=""))
+                    module.add(VCndMaskB32(dst=vgpr(GSUMvgpr), src1=vgpr(bufferOOB), src0=addr0, src2=VCC(), comment="protect if OOB"))
 
                     if(kernel["ProblemType"]["DestDataType"].numRegisters() > 1):
                         module.add(writer.chooseGlobalRead(True, bps, tmpVAdd+gwvw*kernel["ProblemType"]["DestDataType"].numRegisters()*i, \
@@ -2332,8 +2336,8 @@ class GSUOn(GSU):
             writer.sgprPool.checkIn(tmpWSD)
 
         writer.sgprPool.checkIn(tmpS06)
-        writer.sgprPool.checkIn(tmpS05)
-        writer.sgprPool.checkIn(tmpS04)
+        # writer.sgprPool.checkIn(tmpS05)
+        # writer.sgprPool.checkIn(tmpS04)
         writer.sgprPool.checkIn(tmpS03)
         writer.sgprPool.checkIn(tmpS02)
         writer.sgprPool.checkIn(tmpS01)

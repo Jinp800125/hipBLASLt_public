@@ -1034,6 +1034,9 @@ namespace TensileLite
         // avoid gsu < 1
         autoGSU = max(autoGSU, 1);
 
+        // SynchronizerSizeCheck
+        autoGSU = (40960/(sizeMapping.synchronizerSizePerWG * problem.getNumTiles(sizeMapping, autoGSU))) > 1 ? autoGSU : 1;
+
         static const char* envStr = std::getenv("TENSILE_AUTO_GSU_ALGO");
         if(envStr != NULL)
             std::cout << "autoGSU is calculated: " << autoGSU << std::endl;
@@ -3864,11 +3867,11 @@ namespace TensileLite
 
         double L1_hit = (A_L1_hit * MT0 + B_L1_hit * MT1) / (MT0 + MT1);
         double TCP_efficiency = getTCPEfficiency(depthU, K, bpeA, L1_hit); //assume bpeA=bpeB.
-        //double mem_overall = L1_overall + L2_overall + L3_overall + hbm_overall; //old method
-        double mem_overall = (L1_overall * (1 - L1_hit) / TCP_efficiency) +
-                             (L2_overall * 0.3) +
-                             (L3_overall * (1 - L2_hit_rate.totalHitRate)) +
-                             (hbm_overall * 0.1);
+        double mem_overall = L1_overall + L2_overall + L3_overall + hbm_overall; //old method
+        // double mem_overall = (L1_overall * (1 - L1_hit) / TCP_efficiency) +
+        //                      (L2_overall * 0.3) +
+        //                      (L3_overall * (1 - L2_hit_rate.totalHitRate)) +
+        //                      (hbm_overall * 0.1);
 
         double loop_overall = 0.0;
         if(PGR > 1 && loopCnt > 0)

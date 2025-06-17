@@ -244,6 +244,12 @@ namespace TensileLite
                 temp_predictionThreshold = m_predictionThreshold/3;
             else if(K <= 8192)
                 temp_predictionThreshold = m_predictionThreshold/4;
+            else if(K <= 16384)
+                temp_predictionThreshold = m_predictionThreshold/5;
+            else if(K <= 32768)
+                temp_predictionThreshold = m_predictionThreshold/6;
+            else if(K <= 65536)
+                temp_predictionThreshold = m_predictionThreshold/7;
             size_t index    = std::min(performance.size() - 1, size_t(performance.size() * temp_predictionThreshold));
             auto threshhold = performance[index].second;
 

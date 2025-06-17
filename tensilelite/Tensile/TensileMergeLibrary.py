@@ -276,7 +276,9 @@ def mergeLogic(oriData, incData, forceMerge, noEff=False):
 
 def avoidRegressions(originalDir, incrementalDir, outputPath, forceMerge, noEff=False):
     originalFiles = allFiles(originalDir)
-    incrementalFiles = allFiles(incrementalDir)
+    # incrementalFiles = allFiles(incrementalDir)
+    incrementalFiles = []
+    incrementalFiles.append(incrementalDir)
     ensurePath(outputPath)
 
     incrementalFilesTemp = []

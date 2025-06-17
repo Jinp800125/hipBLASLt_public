@@ -470,6 +470,7 @@ class ProblemPredicate(Properties.Predicate):
             else:
                 valuepredicates.append(1)
             valuepredicates.append(ceil(state["NumThreads"] / state["WavefrontSize"]))
+            valuepredicates.append(state["GlobalSplitU"])
             rv += [cls('SynchronizerSizeCheck', index=0, value=valuepredicates)]
 
         if state["InternalSupportParams"]["KernArgsVersion"] >= 1 and \

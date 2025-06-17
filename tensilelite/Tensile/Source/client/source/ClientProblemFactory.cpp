@@ -372,7 +372,7 @@ namespace TensileLite
                             else
                             {
                                 rv.back().setSynchronizer(
-                                    m_constantTypes[ContractionProblemGemm::CONST::ALPHA], 409600);
+                                    m_constantTypes[ContractionProblemGemm::CONST::ALPHA], 4096000);
                             }
                             if(j < m_activationEnumArg.size())
                             {
