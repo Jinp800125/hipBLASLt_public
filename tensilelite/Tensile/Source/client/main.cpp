@@ -895,10 +895,12 @@ int main(int argc, const char* argv[])
                 if (VICTOR_LOG)
                     std::cout << "CLEAR STEP1 RESULT\n";
                 int solu_count = v_top.size()-1;
+                std::cout << "total solu_count: " << solu_count << std::endl;
                 while(solu_count >= 0)
                 {
                     auto solution = solutionIterator->getSolution(v_top[solu_count]);
                     solu_count--;
+                    std::cout << "solu_count: " << solu_count << std::endl;
                     if(solution == nullptr)
                         throw std::runtime_error("Could not find a solution");
 

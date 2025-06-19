@@ -359,9 +359,13 @@ namespace TensileLite
                     std::cout << "LogReporter.hpp::postSolution S\n";
                 std::unordered_map<std::string, std::string> curRow;
                 m_csvOutput.readCurrentRow(curRow);
+                if (VICTOR_LOG)
+                    std::cout << "LogReporter.hpp readCurrentRow E\n";
                 bool  validation    = !(curRow[ResultKey::Validation] == "FAILED"
                                     || curRow[ResultKey::Validation] == "INVALID");
                 float currentTimeUS = std::stof(curRow[ResultKey::TimeUS]);
+                if (VICTOR_LOG)
+                    std::cout << "LogReporter.hpp Debug 1\n";
                 if(m_rowLevel <= m_level
                    && (!m_PrintWinnersOnly || currentTimeUS < m_winner || !validation
                        || m_firstRun))
@@ -375,13 +379,18 @@ namespace TensileLite
                                   << std::endl;
                     else
                         m_csvOutput.writeCurrentRow();
+                    if (VICTOR_LOG)
+                        std::cout << "LogReporter.hpp writeCurrentRow E\n";
                     if(validation && !std::isnan(currentTimeUS))
                     {
                         m_winner = currentTimeUS;
                     }
                     m_firstRun = false;
                 }
+                // std::cout << "LogReporter.hpp m_csvOutput size " << m_csvOutput.m_stack.size() << std::endl;
                 m_csvOutput.pop();
+                if (VICTOR_LOG)
+                    std::cout << "LogReporter.hpp m_csvOutput.pop E\n";
                 if (VICTOR_LOG)
                     std::cout << "LogReporter.hpp::postSolution E\n";
             }

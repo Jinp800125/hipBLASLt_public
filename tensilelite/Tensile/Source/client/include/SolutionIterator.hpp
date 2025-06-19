@@ -161,7 +161,7 @@ namespace TensileLite
 
             virtual void preProblem(ContractionProblem* const problem) override;
             virtual void postProblem() override;
-            virtual void STEP2resetProblem() override{if (VICTOR_LOG) std::cout << "STEP2resetProblem 0\n";};
+            virtual void STEP2resetProblem() override{m_Step = 1; if (VICTOR_LOG) std::cout << "STEP2resetProblem 0\n";};
 
             virtual void preSolution(ContractionSolution const& solution) override;
             virtual void postSolution() override;
@@ -184,6 +184,7 @@ namespace TensileLite
 
             int m_currentSolutionIdx;
             int m_currentIdx;
+            int m_Step = 0;
 
             RunCriteria m_runCriteria;
         };
@@ -224,7 +225,7 @@ namespace TensileLite
 
             virtual void preProblem(ContractionProblem* const problem) override;
             virtual void postProblem() override;
-            virtual void STEP2resetProblem() override{if (VICTOR_LOG) std::cout << "STEP2resetProblem 2\n";};
+            virtual void STEP2resetProblem() override{m_Step = 1; if (VICTOR_LOG) std::cout << "STEP2resetProblem 2\n";};
 
             virtual void preSolution(ContractionSolution const& solution) override;
             virtual void postSolution() override;
@@ -239,6 +240,7 @@ namespace TensileLite
             std::unordered_map<int,double>                    m_hitrate;
             int                                               m_numSolutions       = 1;
             int                                               m_currentSolutionIdx = 0;
+            int m_Step = 0;
 
             double m_predictionThreshold;
             double m_currentPrediction;

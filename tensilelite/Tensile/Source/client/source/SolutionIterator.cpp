@@ -205,12 +205,15 @@ namespace TensileLite
             }
 
             m_currentSolutionIdx = m_firstSolutionIdx;
+            std::cout << "m_currentSolutionIdx DEBUG1" << std::endl;
         }
 
         void AllSolutionsIterator::preProblem(ContractionProblem* const problem)
         {
+            std::cout << "TopSolutionIterator::preProblem" << std::endl;
             SolutionIterator::preProblem(problem);
 
+            // m_currentSolutionIdx = m_firstSolutionIdx;
             std::vector<std::pair<int,double>> performance;
             for (int i = m_firstSolutionIdx; i <= m_lastSolutionIdx; i++)
             {
@@ -236,7 +239,7 @@ namespace TensileLite
             // May use the best perf * 1.x as threshold in the future.
             uint32_t K = dynamic_cast<ContractionProblemGemm*>(problem)->boundSize(0);
             double temp_predictionThreshold;
-            if(K <= 512)
+            if (1)//(K <= 512)
                 temp_predictionThreshold = m_predictionThreshold;
             else if(K <= 1024)
                 temp_predictionThreshold = m_predictionThreshold/2;
@@ -274,12 +277,14 @@ namespace TensileLite
                 }
             }
             m_currentSolutionIdx = m_qSolutionIdx.front().first;
+            std::cout << "m_currentSolutionIdx DEBUG2: " << m_currentSolutionIdx << std::endl;
             m_currentPrediction  = m_qSolutionIdx.front().second;
             m_currentIdx = 0;
 
             std::cout<<"predict performance is "<<performance[0].second<<std::endl;
             std::cout<<"Threshold performance is "<<threshhold<<std::endl;
             std::cout<<"Solution number is "<<m_qSolutionIdx.size()<<std::endl;
+            std::cout << "TopSolutionIterator m_qSolutionIdx LEN" << m_qSolutionIdx.size() << std::endl;
         }
 
         void AllSolutionsIterator::postProblem() {}
@@ -294,21 +299,29 @@ namespace TensileLite
 
         void AllSolutionsIterator::postSolution()
         {
-            m_currentIdx++;
-            m_qSolutionIdx.pop();
-            if(!m_qSolutionIdx.empty())
+            // m_currentSolutionIdx++;
+            if (!m_Step) 
             {
-                m_currentSolutionIdx = m_qSolutionIdx.front().first;
-                m_currentPrediction  = m_qSolutionIdx.front().second;
+                m_currentIdx++;
+                m_qSolutionIdx.pop();
+                if(!m_qSolutionIdx.empty())
+                {
+                    m_currentSolutionIdx = m_qSolutionIdx.front().first;
+                    // std::cout << "m_currentSolutionIdx DEBUG3" << std::endl;
+                    m_currentPrediction  = m_qSolutionIdx.front().second;
+                }
             }
-            if (VICTOR_LOG) // Victor check
-                std::cout << "AllSolutionsIterator::postSolution\n"; // Victor check
-            m_currentSolutionIdx++; // Victor check
+            // if (VICTOR_LOG) // Victor check
+            //     std::cout << "AllSolutionsIterator::postSolution\n"; // Victor check
+            // m_currentSolutionIdx++; // Victor check
         }
 
         bool AllSolutionsIterator::moreSolutionsInProblem() const
         {
-            return !m_qSolutionIdx.empty();
+            if (!m_Step) 
+                return !m_qSolutionIdx.empty();
+            else
+                return m_currentSolutionIdx <= m_lastSolutionIdx;
         }
 
         std::shared_ptr<ContractionSolution> AllSolutionsIterator::getSolution()
@@ -331,6 +344,7 @@ namespace TensileLite
                 return std::shared_ptr<ContractionSolution>();
 
             m_currentSolutionIdx = i_SolutionIdx;
+            //std::cout << "m_currentSolutionIdx DEBUG4" << std::endl;
 
             return iter->second;
         }
@@ -448,6 +462,8 @@ namespace TensileLite
             }
             else if(auto gemmProblem = dynamic_cast<const ContractionProblemGemm*>(problem))
             {
+                // m_solutions
+                //     = m_library->findTopSolutions(*gemmProblem, *m_hardware, m_numSolutions);
                 if(m_numSolutions == -1)
                 {
                     if(m_solutions.size()==0)
@@ -474,6 +490,7 @@ namespace TensileLite
             {
                 m_solutions.push_back(m_library->solutions.find(0)->second);
             }
+            // m_currentSolutionIdx = 0;
             std::vector<std::pair<int,double>> performance;
             for (int i = 0; i < m_solutions.size(); i++)
             {
@@ -507,6 +524,7 @@ namespace TensileLite
                 }
             }
             m_currentSolutionIdx = m_qSolutionIdx.front().first;
+            std::cout << "m_currentSolutionIdx DEBUG5: " << m_qSolutionIdx.size() << std::endl;
             m_currentPrediction  = m_qSolutionIdx.front().second;
         }
 
@@ -516,32 +534,40 @@ namespace TensileLite
         {
             m_reporter->report(ResultKey::SolutionLibraryIndex, solution.libraryLogicIndex);
             m_reporter->report(ResultKey::SolutionIndex, m_currentSolutionIdx);
+            std::cout << "m_currentSolutionIdx DEBUG6" << std::endl;
             m_reporter->report(ResultKey::SolutionProgress,
                                concatenate(m_currentSolutionIdx,"->",m_currentPrediction," us, ",m_currentSolutionIdx,"/",m_solutions.size()));
         }
 
         void TopSolutionIterator::postSolution()
         {
-            //m_currentSolutionIdx++;
-            m_qSolutionIdx.pop();
-            if(!m_qSolutionIdx.empty())
+            // m_currentSolutionIdx++;
+            if (!m_Step) 
             {
-                m_currentSolutionIdx = m_qSolutionIdx.front().first;
-                m_currentPrediction  = m_qSolutionIdx.front().second;
+                m_qSolutionIdx.pop();
+                if(!m_qSolutionIdx.empty())
+                {
+                    m_currentSolutionIdx = m_qSolutionIdx.front().first;
+                    std::cout << "m_currentSolutionIdx DEBUG7" << std::endl;
+                    m_currentPrediction  = m_qSolutionIdx.front().second;
+                }
             }
             // if (VICTOR_LOG)
             //     std::cout << "TopSolutionIterator::postSolution\n";
-            m_currentSolutionIdx++; // Victor check
+            // m_currentSolutionIdx++; // Victor check
         }
 
         bool TopSolutionIterator::moreSolutionsInProblem() const
         {
-            //return m_currentSolutionIdx < m_solutions.size();
-            return !m_qSolutionIdx.empty();
+            if (!m_Step) 
+                return !m_qSolutionIdx.empty();
+            else
+                return m_currentSolutionIdx <= m_solutions.size();;
         }
 
         std::shared_ptr<ContractionSolution> TopSolutionIterator::getSolution()
         {
+            std::cout << "m_currentSolutionIdx DEBUG8" << std::endl;
             return m_solutions[m_currentSolutionIdx];
         }
 

@@ -77,12 +77,19 @@ namespace TensileLite
 
         void CSVStackFile::writeCurrentRow()
         {
+            if (VICTOR_LOG)
+                std::cout << "\nCSVStackFile::writeCurrentRow\n";
             if(m_firstRow && !m_headers.empty())
                 writeRow(m_headers);
-
+            if (VICTOR_LOG)
+                std::cout << "\nCSVStackFile::writeRow E1\n";
             m_firstRow = false;
 
+            // std::cout << "CSVStackFile.cpp m_csvOutput size " << m_stack.size() << std::endl;
+
             writeRow(m_currentRow);
+            if (VICTOR_LOG)
+                std::cout << "\nCSVStackFile::writeRow E2\n";
 
             if(m_stack.empty())
                 m_currentRow.clear();
@@ -118,8 +125,10 @@ namespace TensileLite
         void CSVStackFile::writeRow(std::unordered_map<std::string, std::string> const& row)
         {
             bool firstCol = true;
+            // std::cout << "\n m_keyOrder\n" << m_keyOrder << std::endl;
             for(auto const& key : m_keyOrder)
             {
+                // std::cout << "\nkey\n" << key << std::endl;
                 if(!firstCol)
                     (*m_stream) << m_separator;
 

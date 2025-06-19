@@ -1029,7 +1029,7 @@ class Solution(collections.abc.Mapping):
       state["StreamKXCCMapping"] = 0
       state["DebugStreamK"] = 0
     state["TunningSkip"] = 0
-    if 1: ## for tunning
+    if 0: ## for tunning
       state["TunningSkip"] = 1
     #   state["BatchSizeEqual"] = 1
 

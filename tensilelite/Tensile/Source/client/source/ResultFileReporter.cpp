@@ -87,7 +87,7 @@ namespace TensileLite
                     std::cout << "ResultFileReporter::reportValue::TimeUS\n"; // Victor check
                 // cascade from BenchmarkTimer, Time-US first
                 // ++m_currSolutionIdx;
-                m_currSolutionIdx = std::stod(m_output.readValueFromKey(ResultKey::SolutionIndex)); // Victor check
+                // m_currSolutionIdx = std::stod(m_output.readValueFromKey(ResultKey::SolutionIndex)); // Victor check
                 if(!m_invalidSolution)
                 {
                     double timeUS = std::stod(valueStr);
