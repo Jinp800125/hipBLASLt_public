@@ -39,6 +39,7 @@
 #include <cstddef>
 #include <limits>
 #include <vector>
+#include <sstream>
 
 namespace TensileLite
 {
@@ -273,10 +274,10 @@ namespace TensileLite
                     HasValue = true
                 };
                 size_t             index;
-                std::array<int, 6> value;
+                std::array<int, 7> value;
 
                 TunningSkip() = default;
-                TunningSkip(size_t index, std::array<int, 6> value)
+                TunningSkip(size_t index, std::array<int, 7> value)
                     : index(index)
                     , value(value)
                 {
@@ -306,9 +307,13 @@ namespace TensileLite
                     int WT0xWT1 = value[3];
                     int LdsNumBytes = value[4];
                     int DU = value[5];
+                    int GSUA = value[6];
 
-                    bool ret = (MT0 <= (std::ceil(std::ceil(problem.d().sizes()[0]/16.0)/4)*4)*16) 
-                            && (MT1 <= (std::ceil(std::ceil(problem.d().sizes()[1]/16.0)/4)*4)*16);
+                    // bool ret = (MT0 <= (std::ceil(std::ceil(problem.d().sizes()[0]/16.0)/4)*4)*16) 
+                    //         && (MT1 <= (std::ceil(std::ceil(problem.d().sizes()[1]/16.0)/4)*4)*16);
+                    // bool ret = true;
+                    bool ret = (MT0 <= std::pow(2,std::ceil(log2(problem.d().sizes()[0]))))
+                            && (MT1 <= std::pow(2,std::ceil(log2(problem.d().sizes()[1]))));
 
                     size_t minK
                         = (problem.getParams().gsu() > 0 ? problem.getParams().gsu() : GSU);
@@ -317,25 +322,76 @@ namespace TensileLite
                         minK = 0;
                     minK *= 64;
 
-                    if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    // if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
                     // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16) / 0.5) // (minMT0 x minMT1 x CUnums / maxGSU) / granularityCheck
-                        ret = ret && ((((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5);
+                        // ret = ret && ((((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5);
                     // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (128*128*304))
-                    if (DU >= 1024)
-                        ret = ret && (LdsNumBytes > 16384);
-                    else
-                        ret = ret && (LdsNumBytes < 32768);
+                    // if (problem.boundSize(0)/DU > 512)
+                    // // if (DU >= 1024)
+                    //     ret = ret && (LdsNumBytes > 16384);
                     // else
-                    //     ret = ret && (GSU == 16 || GSU == 8 || GSU == 1);
+                    //     ret = ret && (LdsNumBytes < 32768);
+                    // // else
+                    // //     ret = ret && (GSU == 16 || GSU == 8 || GSU == 1);
+
+                    // if (problem.boundSize(0)/GSU > DU)
+                    //     ret = ret && ((MT0+MT1)*DU*2 > 16384); //BBS 2bytes per element
+
+                    // if (GSU > 1)
+                    // // if (DU >= 1024)
+                    //     ret = ret && (LdsNumBytes >= 32768);
 
                     float occupancy = 256*256*304*1.0;
                     int tmp6 = std::ceil((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy);
-                    // if (((problem.d().sizes()[0] * problem.d().sizes()[1]) < 256*256*304) and (WT0xWT1 > 2))
-                    // if (WT0xWT1 > 2)
-                    if ((problem.d().sizes()[0] * problem.d().sizes()[1]) < 256*256*304)
-                        ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (2*tmp6));
+                    int tmp6_floor = max(1, std::floor((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy));
+
+                    float occupancy_small = 512*512;
+                    int tmp6_floor_small = std::floor((problem.d().sizes()[0] * problem.d().sizes()[1]) / occupancy_small);
+                    if (GSU > 1)
+                        ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (1*tmp6));
                     else
-                        ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (2*tmp6));
+                    {
+                        if ((problem.d().sizes()[0] * problem.d().sizes()[1]) > 16*16*304) // 1024*1024 // 16*256*304
+                        // if (((problem.d().sizes()[0] * problem.d().sizes()[1]) < 256*256*304) and (WT0xWT1 > 2))
+                        // if (WT0xWT1 > 2)
+                        // if ((problem.d().sizes()[0] * problem.d().sizes()[1]) > 1024*1024) 
+                        // if ((problem.d().sizes()[0] * problem.d().sizes()[1]) > 256*256*304)
+                            // if ((problem.d().sizes()[0] * problem.d().sizes()[1]) > 2048*2048)  && (problem.boundSize(0) > 256)
+                            //     ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (2*tmp6));
+                            // else
+                            //     ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (4*tmp6));
+                            ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (2*tmp6));
+                        else
+                            ret = ret && ((GSU*(std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) <= (4*tmp6));
+                    }
+
+                    // if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (128*128*304)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    // if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*32*4)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    if (1) // ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*256*304)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    // if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    {
+                        // if (problem.d().sizes()[0]*problem.d().sizes()[1] > (16*16*304/16) / 0.5) // (minMT0 x minMT1 x CUnums / maxGSU) / granularityCheck
+                            float a=(GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304;
+                            std::stringstream ss;
+                            ss.setf(std::ios::fixed);
+                            ss.precision(1);
+                            ss << a;
+                            
+                            float c = atof(ss.str().c_str());
+                            if (problem.d().sizes()[0]*problem.d().sizes()[1] > (512*512))
+                                ret = ret && (((c) / std::ceil(c)) >= 1-(0.5/tmp6_floor));
+                            else
+                                ret = ret && (((c) / std::ceil(c)) >= (tmp6_floor_small/2));
+                            // ? ret = ret && ((((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304) / std::ceil((GSU*std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1))/304)) > 0.5);
+                            // if ((GSUA == 2) && (GSU > 1))
+                            //     ret = ret && ((std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1)) >= 32);
+                    }
+
+                    if ((problem.d().sizes()[0]*problem.d().sizes()[1] > (64*64*32)) && (problem.boundSize(0) >= minK)) // (minMT0 x minMT1 x CUnums / maxGSU)
+                    {
+                         if ((GSUA == 2) && (GSU > 1))
+                            ret = ret && ((std::ceil(problem.d().sizes()[0]/MT0)*std::ceil(problem.d().sizes()[1]/MT1)) >= 32);
+                    }
 
                     return ret;
                 }

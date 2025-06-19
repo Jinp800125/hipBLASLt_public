@@ -488,6 +488,13 @@ class ProblemPredicate(Properties.Predicate):
             valuepredicates.append(state["MIWaveGroup"][0]*state["MIWaveGroup"][1])
             valuepredicates.append(state['LdsNumBytes'])
             valuepredicates.append(state['DepthU'])
+
+            if state["_GlobalAccumulation"] == 'SingleBuffer':
+                valuepredicates.append(0)
+            elif state["_GlobalAccumulation"] == 'MultipleBuffer':
+                valuepredicates.append(1)
+            elif state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel':
+                valuepredicates.append(2)
             
             rv += [cls('TunningSkip', index=0, value=valuepredicates)]
 

@@ -342,6 +342,12 @@ class Solution(collections.abc.Mapping):
       state["LocalSplitU"] = 1 if state["WaveSplitK"] else state["WorkGroup"][2]
       state["NumWaveSplitK"]  = state["WorkGroup"][2] if state["WaveSplitK"] else 1
 
+    # if state["MIWaveGroup"][0]*state["MIWaveGroup"][1] == 2:
+    #    state["WorkGroup"][2] = 2
+ 
+    # if state["MIWaveGroup"][0]*state["MIWaveGroup"][1] == 1:
+    #   state["WorkGroup"][2] = 4
+
     if "SubGroup0" in state and "SubGroup1" in state and "LocalSplitU" in state and "NumWaveSplitK" in state:
       state["NumThreads"] = state["SubGroup0"] * state["SubGroup1"] * state["LocalSplitU"] * state["NumWaveSplitK"]
       if (state["NumThreads"] % state['WavefrontSize']) != 0:
@@ -994,7 +1000,7 @@ class Solution(collections.abc.Mapping):
       state["StreamKXCCMapping"] = 0
       state["DebugStreamK"] = 0
     
-    if 0: ## for tunning
+    if 1: ## for tunning
       state["TunningSkip"] = 1
     #   state["BatchSizeEqual"] = 1
 
@@ -1748,6 +1754,8 @@ class Solution(collections.abc.Mapping):
 
       def calcOptGRVW(lrvw: int, unrollMajorLDS: bool, datatype: DataType) -> int:
         # with UnrollMajorLDS, GRVW need to less or equal than LRVW to have conflict free LDS read with padding.
+        # print("lrvw", lrvw, "unrollMajorLDS", unrollMajorLDS)
+        # print("datatype.numRegisters()", datatype.numRegisters(), "datatype.numBytes()", datatype.numBytes())
         optGRVW = lrvw if unrollMajorLDS else 4 / datatype.numRegisters()
         if optGRVW * datatype.numBytes() > 16:
           optGRVW = 16 // datatype.numBytes()
@@ -2097,6 +2105,20 @@ class Solution(collections.abc.Mapping):
               or (state["ProblemType"]["Sparse"] and state["PrefetchGlobalRead"] > 0))):
         state["ExpandPointerSwap"] = 0
 
+    if state["GlobalReadVectorWidthA"] == 4 and state["GlobalReadVectorWidthB"] == 4 and state["DirectToVgprA"] != True and state["DirectToVgprB"] != True::
+      state["GlobalReadVectorWidthA"] = 2
+      state["GlobalReadVectorWidthB"] = 2
+
+    # TN?
+    # if state["DirectToVgprA"] == True and state["MIWaveTile"][1] == 32-4*state["MIWaveTile"][0]:
+    #   state["LdsPadB"] = 0
+
+    # if state["DirectToVgprB"] == True and state["MIWaveTile"][1] == 32-4*state["MIWaveTile"][0]:
+    #   state["LdsPadA"] = 0
+
+    # if state["DirectToVgprA"] == True:
+    #   state["GlobalReadVectorWidthA"] = state["VectorWidthA"]
+
     # Default GlobalStoreVectorWidth
     if state["StoreVectorWidth"] == -1:
       if state["SourceSwap"]:
@@ -2127,6 +2149,10 @@ class Solution(collections.abc.Mapping):
     # LocalSplitU too large?
     # dot2: every NumWaveSplitK threads compute the same element.
     numElementsPerWorkGroup = state["MacroTile0"]*state["MacroTile1"]*state["NumWaveSplitK"]
+
+    if (state["MacroTile0"] > 512 or state["MacroTile1"] > 512):
+      reject(state, "MacroTile0 or MacroTile1 > 512")
+      return
 
     if numElementsPerWorkGroup < state["NumThreads"]:
       reject(state, printRejectionReason, "NumElementsPerWorkGroup %u < NumThreads %u; reduce LocalSplitU" \
@@ -2643,6 +2669,11 @@ class Solution(collections.abc.Mapping):
       if state["DirectToLds"] and state["1LDSBuffer"]:
         reject(state, printRejectionReason, "1LDSBuffer must be 0 for directToLds")
 
+    # print("ldsSizeOccupancy", ldsSizeOccupancy)
+    # print("ldsNumBytesAB", ldsNumBytesAB)
+    # print("LdsOffsetB_Blk", state["LdsOffsetB_Blk"])
+    # print("ldsNumBytesB", ldsNumBytesB)
+
     if state["1LDSBuffer"] == -1:
       if ldsNumBytesAB  <= max(ldsSizeOccupancy,32768) or \
           (state["ProblemType"]["ComputeDataType"].numBytes() * state["MacroTile0"] * state["MacroTile1"] > 32768*4 and \
@@ -2663,6 +2694,8 @@ class Solution(collections.abc.Mapping):
 
     # lds size is the greater of the two
     ldsNumBytes = max(ldsNumBytesAB, ldsNumBytesReduction, ldsNumBytesOccupancy)
+
+    # print("ldsNumBytes", ldsNumBytes)
 
     if state["NumElementsPerBatchStore"] == -1:
       state["NumElementsPerBatchStore"] = (16 // state["MIWaveTile"][0]) * state["MIWaveTile"][0]
@@ -2942,6 +2975,7 @@ class Solution(collections.abc.Mapping):
       ldsAmaxDBytes = 4 * (num_workItems // half_wave_size) * amaxBPE
       ldsNumBytes += ldsAmaxDBytes
 
+    # print("state[LdsNumBytes]", ldsNumBytes)
     state["LdsNumBytes"] = ldsNumBytes
     ldsSize = ldsNumBytes
     if ldsSize > state["MaxLDS"]:

@@ -679,6 +679,8 @@ class KernelWriterAssembly(KernelWriter):
           for iui in range(0, kernel["InnerUnroll"]):
             moduleVgprMacroValuA.add(RegSet("v", "vgprValuA_X%u_I%u"%(bi,iui), "vgprValuA_X0_I0_BASE", ri))
             ri += self.states.a.numVgprValuPerBlock
+            # module.add(RegSet("v", "vgprValuA_X%u_I%u"%(bi,iui), self.states.a.startVgprValuPack+ri))
+            # ri += ceil(kernel["VectorWidthA"] * tPA["bpe"] / self.states.bpr) * kernel["MIWaveTileA"] // kernel["VectorWidthA"]
           if (tPA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]):
             ri = 0
         ri = 0
@@ -11904,6 +11906,7 @@ class KernelWriterAssembly(KernelWriter):
     # Free after final vgpr vcalculation
     if tmpVgprDynamic:
       self.vgprPool.checkIn(tmpVgprDynamic.idx)
+      # print("3.self.vgprPool.size()", self.vgprPool.size()) # DEBUGG F8 MultipleBufferSingleKernel pure gemm vs non pure gemm
 
     if len(actLoopLabelModules) > 1:
       actInstCounter = 0

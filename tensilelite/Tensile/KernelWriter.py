@@ -4255,6 +4255,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.a.startVgprValu  = vgprIdx
     self.states.startVgpr        = vgprIdx
     vgprIdx += self.states.a.numVgprValu
+    # vgprIdx += 0 #self.states.a.numVgprValu
     numVgprValuPackA = 0
     if tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]:
       self.states.a.startVgprValuPack = vgprIdx
