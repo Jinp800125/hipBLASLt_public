@@ -102,6 +102,7 @@ namespace TensileLite
                                 = std::stod(m_output.readValueFromKey(ResultKey::TotalGranularity));
                         }
                     }
+                    m_top[timeUS].push_back(m_currSolutionIdx);
                 }
             }
             else if((key == ResultKey::SpeedGFlops
@@ -120,7 +121,7 @@ namespace TensileLite
                         m_winnerSolutionIdx = m_currSolutionIdx;
                         m_fastestGflops     = gflops;
                     }
-                    m_top[gflops].push_back(m_currSolutionIdx);
+                    // m_top[gflops].push_back(m_currSolutionIdx);
                 }
             }
             else
@@ -320,6 +321,7 @@ namespace TensileLite
             m_fasterTimeUS            = -1.0;
             m_fastestTilesPerCu       = -1.0;
             m_fastestTotalGranularity = -1.0;
+            m_top.clear();
         }
 
         void ResultFileReporter::postSolution()

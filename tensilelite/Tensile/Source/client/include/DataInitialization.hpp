@@ -854,12 +854,8 @@ namespace TensileLite
             {
             }
 
-<<<<<<< HEAD
             virtual void finalizeReport() override{}
-=======
-            virtual void finalizeReport() override{};
             virtual void getTop(std::vector<int64_t> &v_top, int top_want) override {};
->>>>>>> 4e0c4816... TEST STEP3
 
             virtual int error() const override
             {

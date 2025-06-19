@@ -147,8 +147,8 @@ namespace TensileLite
             {
                 if (VICTOR_LOG)
                     std::cout << "STEP2resetProblem 7\n";
-                // for(auto iter = m_reporters.rbegin(); iter != m_reporters.rend(); iter++)
-                //     (*iter)->STEP2resetProblem();
+                for(auto iter = m_reporters.rbegin(); iter != m_reporters.rend(); iter++)
+                    (*iter)->STEP2resetProblem();
             }
 
             virtual void preSolution(ContractionSolution const& solution) override

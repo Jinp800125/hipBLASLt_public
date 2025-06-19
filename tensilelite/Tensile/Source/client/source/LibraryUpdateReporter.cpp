@@ -140,6 +140,7 @@ namespace TensileLite
 
         void LibraryUpdateReporter::postProblem()
         {
+            std::cout << "LibraryUpdateReporter::postProblem\n";
             if(m_fastestSolutionIdx < 0)
             {
                 m_stream << "# [";

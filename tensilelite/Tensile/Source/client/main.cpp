@@ -734,6 +734,8 @@ int main(int argc, const char* argv[])
                 auto inputs = dataInit->prepareGPUInputs(problem);
 
                 size_t warmupInvocations    = listeners.numWarmupRuns();
+                if (warmupInvocations == -1)
+                    warmupInvocations = max(1, warmupInvocations);
                 size_t syncs                = listeners.numSyncs();
                 size_t enq                  = listeners.numEnqueuesPerSync();
                 size_t maxRotatingBufferNum = max(warmupInvocations, syncs * enq);
@@ -789,6 +791,8 @@ int main(int argc, const char* argv[])
                                 }
 
                                 size_t       warmupInvocations = listeners.numWarmupRuns();
+                                if (warmupInvocations == -1)
+                                    warmupInvocations = max(1, warmupInvocations);
                                 size_t       warmupEventCount  = kernels[0].size();
                                 TimingEvents warmupStartEvents(warmupInvocations, warmupEventCount);
                                 TimingEvents warmupStopEvents(warmupInvocations, warmupEventCount);
@@ -822,7 +826,7 @@ int main(int argc, const char* argv[])
                                         listeners.preEnqueues(stream);
                                         if (VICTOR_LOG)
                                             std::cout << "Victor enq( " << enq << " )\n";
-                                        for(int j = 0; j < enq; j++)
+                                        for(int j = 0; j < 1; j++)
                                         {
                                             size_t kIdx = ((i * enq) + j) % kernels.size();
                                             // std::cout << "Victor kIdx( " << kIdx << " )\n";
@@ -868,10 +872,13 @@ int main(int argc, const char* argv[])
                         return std::min(listeners.error(), 255);
                     }
                 }
-                
+                if (warmupInvocations == -1)
+                    warmupInvocations = min(args["num-enqueues-per-sync"].as<int>()/32, ceil(enq*2));
+
                 int w_top = enq;
+                w_top = max(64,ceil(w_top/args["num-enqueues-per-sync"].as<int>()/64));
                 if (1)
-                    std::cout << "STEP1 END\n\nTOP " << w_top << "\n\n";
+                    std::cout << "STEP1 END\n\nTOP:  " << w_top << " enq:" << enq << " warm:" << warmupInvocations << "\n\n";
 
                 std::vector<int64_t> v_top;
                 reporters->getTop(v_top, w_top);
@@ -887,11 +894,11 @@ int main(int argc, const char* argv[])
                 listeners.STEP2resetProblem();
                 if (VICTOR_LOG)
                     std::cout << "CLEAR STEP1 RESULT\n";
-                int solu_count = 0;
-                while(solu_count < v_top.size())
+                int solu_count = v_top.size()-1;
+                while(solu_count >= 0)
                 {
                     auto solution = solutionIterator->getSolution(v_top[solu_count]);
-                    solu_count++;
+                    solu_count--;
                     if(solution == nullptr)
                         throw std::runtime_error("Could not find a solution");
 
@@ -932,10 +939,19 @@ int main(int argc, const char* argv[])
                                     kernels.push_back(kernel);
                                 }
 
+                                size_t enq   = listeners.numEnqueuesPerSync();
+                                // enq   *= 16;
+                                // size_t       warmupInvocations = max(1, ceil(enq/8));
+
                                 size_t       warmupInvocations = listeners.numWarmupRuns();
+                                if (warmupInvocations == -1)
+                                    warmupInvocations = min(args["num-enqueues-per-sync"].as<int>()/32, ceil(enq*2)); //warmupInvocations = max(1, ceil(enq/512));
                                 size_t       eventCount        = gpuTimer ? kernels[0].size() : 0;
                                 TimingEvents warmupStartEvents(warmupInvocations, eventCount);
                                 TimingEvents warmupStopEvents(warmupInvocations, eventCount);
+
+                                if (0)
+                                    std::cout << "warmupInvocations: " << warmupInvocations << "enq: " << enq << "\n\n";
 
                                 for(int i = 0; i < warmupInvocations; i++)
                                 {
@@ -949,7 +965,7 @@ int main(int argc, const char* argv[])
                                     else
                                         HIP_CHECK_EXC(adapter.launchKernels(
                                             kernels[kIdx], stream, nullptr, nullptr));
-                                    listeners.postWarmup();
+                                    listeners.postWarmup(warmupStartEvents, warmupStopEvents, stream);
                                     // Do validation after first warmup
                                     if(i == 0)
                                         listeners.validateWarmups(
@@ -957,7 +973,7 @@ int main(int argc, const char* argv[])
                                 }
 
                                 size_t syncs = listeners.numSyncs();
-                                size_t enq   = listeners.numEnqueuesPerSync();
+                                // size_t enq   = listeners.numEnqueuesPerSync();
 
                                 listeners.preSyncs();
 
